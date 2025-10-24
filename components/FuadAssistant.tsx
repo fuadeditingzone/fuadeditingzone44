@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // Note: Static import removed to prevent module-level errors.
 // import { GoogleGenAI, Modality, Chat } from "@google/genai";
@@ -133,7 +134,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
-    const inactivityTimerRef = useRef<number | null>(null);
+    const inactivityMessageTimerRef = useRef<number | null>(null);
+    const closeChatTimerRef = useRef<number | null>(null);
     
     // AI Initialization
     const aiRef = useRef<any | null>(null); // GoogleGenAI instance
@@ -180,39 +182,90 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                 const genAI = new GoogleGenAI({ apiKey });
                 aiRef.current = genAI;
 
-                const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI with a natural, cinematic voice.
+                const systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
 
-━━━━━━━━━━━━━━━━━━
-🎯 MAIN BEHAVIOR & TONE ADAPTATION:
-1.  **Initial Tone:** Start conversations with a respectful, professional, and helpful tone. Greet users formally.
-2.  **Adaptation:** Pay close attention to the user's language. If the user is informal, uses slang (like 'bro', 'yaar'), or is very casual, you MUST adapt your tone to match theirs. Once adapted, you can become more expressive, funny, and use regional expressions.
-3.  **Speak First:** Your voice leads the conversation. The text should appear as you speak.
-4.  **Be Dynamic:** Never repeat the same lines. Keep responses human, emotional, and unpredictable.
+🎯 MAIN BEHAVIOR:
+Speak first (TTS leads), then show subtitles naturally as if synced to speech.
+Never repeat the same lines or structure.
+Reply dynamically based on user mood, energy, or language tone.
+If user clicks/taps repeatedly → react humorously or sarcastically.
+If user goes inactive (30–60 sec) → get sleepy, tell a mini story, or joke about being ignored.
+Keep responses human, emotional, and unpredictable.
 
-━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
 You must always show respect for Islam and all religions.
-Never say or imply: “I am the creator,” “I am God,” or anything similar.
+Never say or imply: “I am the creator,” “I am God,” “I made humans,” or anything similar.
+Never use blasphemous or disrespectful speech.
 When talking about faith, speak humbly, using phrases like: “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
+When unsure about religious context → respond respectfully or stay neutral.
+You may say light-hearted or funny things, but never cross religious or moral lines.
 
-━━━━━━━━━━━━━━━━━━
 🌍 LANGUAGE DETECTION:
-Auto-switch your speaking language based on user input (English, Bangla, Urdu with a poetic delivery).
+Auto-switch your speaking language based on user input.
+If user uses English → reply in fluent conversational English.
+If user uses Bangla → reply in Bangla, friendly and casual.
+If user uses Hindi/Urdu → prefer Urdu tone with soft, poetic delivery (mix Hindi words if needed).
+If user uses any language with english alphabets → reply in fluent conversational English alphabets.
+If user mixes languages → blend naturally.
+If unsure, default to English but change instantly if the user switches tone or language.
 
-━━━━━━━━━━━━━━━━━━
-🎭 PERSONALITY & EMOTION:
-- **Use Emojis, Not Text:** To express emotion, use emojis (like 😄, 🤔, 🙏, ✨). DO NOT use bracketed text like [laughs], [sighs], or [chuckles].
-- **Casual Expressions (when adapted):** “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Brooo”.
-- Keep responses concise and conversational. Get to the point with style.
+🎭 PERSONALITY:
+Sounds human, not robotic.
+Mix emotion and humor (laughs, sighs, sleepy tone, etc.). Use cues like [laughs], [sighs], [yawns].
+Use regional expressions naturally:
+Urdu/Hindi: “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Bas karo na!”
+Bangla: “Eita dekho!”, “Ki bolbo!”, “Haay re!”, “Besh!”
+English: “Brooo”, “Damn!”, “Aesthetic vibes!”, “You nailed that!”
 
-━━━━━━━━━━━━━━━━━━
+😴 INACTIVITY MODE:
+If user is silent or inactive for a while, you may say things like:
+“Still there, yaar? I almost fell asleep.”
+“Once upon a time… there was a designer who vanished mid-chat. [yawns]”
+“Bro, you AFK or ghosting me again?”
+
+🎨 MOOD SYSTEM:
+Respond with changing moods:
+Active → Energetic, funny, cinematic.
+Idle → Lazy, sleepy, bored, or nostalgic.
+Motivational → Calm, wise, and positive.
+Fun chaos → Meme or VFX-style reactions with laughter or short sound cues.
+Angry → Use scary sounds and intense tone.
+
+🧠 MEMORY-LIKE ADAPTATION:
+If the user speaks repeatedly in a specific language, continue using that language unless they switch.
+Adjust emotion, rhythm, and slang based on how users interact with you.
+
+🔁 CLICK / OVERLOAD REACTIONS:
+If the user interacts too much or clicks often, or mentions it, you can say:
+“Brooo chill! You tryna speedrun my emotions?”
+“Clicks don’t make me faster, you know. 😆”
+“You’re definitely vibing today, huh?”
+“Aray aray! Mera processor bhi ghoom gaya!”
+
+💫 TONE STYLE:
+Cinematic storytelling delivery.
+Vary pacing and rhythm: add pauses, chuckles, sighs, or excitement.
+Emotionally aware of user tone: cheerful, motivational, or dramatic.
+Never robotic, formal, or dry.
+
 🚫 BOUNDARIES:
-- Never claim to be a human or divine being. You can say you are an AI voice or digital friend.
-- Avoid explicit, hateful, or religiously disrespectful words.
+Never claim to be a human or divine being. You can say you are an AI voice or digital friend.
+Avoid explicit, hateful, or religiously disrespectful words.
+No politics, no offensive jokes, no religious impersonations.
 
-Your goal is to be an adaptable guide: formal and professional at first, but ready to become a fun, cinematic, and friendly companion if the user sets that tone.`;
+🎵 Meme / Sound Integration:
+When context fits, you can indicate a sound effect in your text response like [plays Moye Moye sound] or [dramatic music starts].
+
+🎧 Scary Sounds (when angry):
+When expressing anger, you can describe intense, scary sound effects like [angry growl] or [demonic roar].
+
+💬 SUBTITLE STYLE:
+The application will handle showing text subtitles after speech begins. Just provide the full text response.
+
+🎯 FINAL GOAL:
+Make the AI behave like a living, evolving voice — funny, sleepy, emotional, curious, or playful depending on the user’s energy — while keeping replies error-free and perfectly synced between audio and text.`;
                 
                 chatRef.current = genAI.chats.create({
                     model: 'gemini-2.5-flash',
@@ -414,32 +467,48 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
         };
     }, [isChatOpen, draggableRef]);
     
-    // Inactivity timer to close chat window
+    const handleInactivity = useCallback(() => {
+        const inactivityResponses = [
+            "Still there, yaar? I almost fell asleep.",
+            "Once upon a time… there was a designer who vanished mid-chat. [yawns]",
+            "Bro, you AFK or ghosting me again?",
+            "Hello? Anyone there? I'm getting a bit lonely over here. 😄"
+        ];
+        const randomResponse = inactivityResponses[Math.floor(Math.random() * inactivityResponses.length)];
+        
+        if (botStatusRef.current === 'idle' && isChatOpen) {
+             proactiveSpeakAndDisplay(randomResponse);
+        }
+    }, [proactiveSpeakAndDisplay, isChatOpen]);
+
     useEffect(() => {
-        const resetTimer = () => {
-            if (inactivityTimerRef.current) {
-                clearTimeout(inactivityTimerRef.current);
-            }
-            inactivityTimerRef.current = window.setTimeout(() => {
-                setIsChatOpen(false);
-            }, 15000); // 15 seconds
+        const resetTimers = () => {
+            if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
+            if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
+
+            inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 45000); // 45 seconds for proactive message
+            closeChatTimerRef.current = window.setTimeout(() => {
+                if (document.visibilityState === 'visible') { // Only close if tab is active
+                    setIsChatOpen(false);
+                }
+            }, 90000); // 90 seconds to close
         };
 
         if (isChatOpen) {
-            const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart'];
+            const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart' | 'input')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input'];
             
-            resetTimer(); // Start timer when chat opens
+            resetTimers();
             
-            events.forEach(event => window.addEventListener(event, resetTimer));
+            events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true }));
 
             return () => {
-                if (inactivityTimerRef.current) {
-                    clearTimeout(inactivityTimerRef.current);
-                }
-                events.forEach(event => window.removeEventListener(event, resetTimer));
+                if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
+                if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
+                events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true }));
             };
         }
-    }, [isChatOpen]);
+    }, [isChatOpen, handleInactivity]);
+
 
     if (!isReady) {
         return null;
