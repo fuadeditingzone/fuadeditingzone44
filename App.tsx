@@ -14,6 +14,7 @@ import { ModalViewer, GalleryGridModal } from './components/ModalViewer';
 import { ProfileCard } from './components/ProfileCard';
 import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
+import { FuadAssistant } from './components/FuadAssistant';
 
 const AUDIO_SOURCES = {
   background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
@@ -292,6 +293,7 @@ export default function App() {
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
       </div>
+      <FuadAssistant sectionRefs={sections} />
     </div>
   );
 }

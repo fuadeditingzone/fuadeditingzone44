@@ -159,19 +159,14 @@ export const FastForwardIcon = ({ className }: { className?: string }) => (
 );
 
 // --- Chat Icons ---
-export const MicrophoneIcon = ({ className }: { className?: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m12 0v-1.5a6 6 0 0 0-12 0v1.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 10.875a4.125 4.125 0 0 1 7.5 0" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75a.375.375 0 0 1 .375.375v1.5a.375.375 0 0 1-.75 0v-1.5A.375.375 0 0 1 12 15.75Z" />
+export const PaperAirplaneIcon = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M3.105 2.289a.75.75 0 0 0-.826.95l1.414 4.949a.75.75 0 0 0 .95.826L11.25 9.25v1.5L4.643 12.51a.75.75 0 0 0-.95.826l-1.414 4.949a.75.75 0 0 0 .95.826L17.64 12l-14.535-9.711z" />
     </svg>
 );
 
-export const MicrophoneSlashIcon = ({ className }: { className?: string }) => (
+export const ChatBubbleIcon = ({ className }: { className?: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m12 0v-1.5a6 6 0 0 0-12 0v1.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 10.875a4.125 4.125 0 0 1 7.5 0" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75a.375.375 0 0 1 .375.375v1.5a.375.375 0 0 1-.75 0v-1.5A.375.375 0 0 1 12 15.75Z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.761 9.761 0 0 1-2.542-.381 1.483 1.483 0 0 0-.942.13l-4.163 1.162a.75.75 0 0 1-.962-.962l1.162-4.163a1.483 1.483 0 0 0 .13-.942A9.761 9.761 0 0 1 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
     </svg>
 );

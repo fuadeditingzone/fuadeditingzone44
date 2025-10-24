@@ -299,54 +299,6 @@
         animation-duration: 35s;
       }
 
-      .waveform {
-        display: flex;
-        align-items: center;
-        height: 24px;
-        padding: 0 8px; /* Give it some horizontal space */
-      }
-      .waveform .bar {
-        width: 3px;
-        height: 4px;
-        margin: 0 2px;
-        background-color: #e50914; /* red */
-        border-radius: 2px;
-        animation: waveform-animation 0.9s infinite ease-in-out;
-      }
-      .waveform .bar:nth-child(2) { animation-delay: -0.8s; }
-      .waveform .bar:nth-child(3) { animation-delay: -0.7s; }
-      .waveform .bar:nth-child(4) { animation-delay: -0.6s; }
-      .waveform .bar:nth-child(5) { animation-delay: -0.5s; }
-      @keyframes waveform-animation {
-        0%, 40%, 100% { transform: scaleY(0.2); }
-        20% { transform: scaleY(1.0); }
-      }
-
-      /* Waveform for Floating Chat Button */
-      .fcb-waveform {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          width: 100%;
-      }
-      .fcb-waveform .fcb-bar {
-          width: 3px;
-          height: 4px;
-          margin: 0 1.5px;
-          background-color: #fff;
-          border-radius: 2px;
-          animation: fcb-waveform-animation 0.9s infinite ease-in-out;
-      }
-      .fcb-waveform .fcb-bar:nth-child(2) { animation-delay: -0.8s; }
-      .fcb-waveform .fcb-bar:nth-child(3) { animation-delay: -0.7s; }
-      .fcb-waveform .fcb-bar:nth-child(4) { animation-delay: -0.6s; }
-      .fcb-waveform .fcb-bar:nth-child(5) { animation-delay: -0.5s; }
-      @keyframes fcb-waveform-animation {
-          0%, 40%, 100% { transform: scaleY(0.2); }
-          20% { transform: scaleY(1.0); }
-      }
-
       /* Bot Typing Indicator */
       .typing-indicator {
         display: flex;
@@ -374,6 +326,49 @@
         40% {
           transform: scale(1);
         }
+      }
+      
+      /* --- FUAD ASSISTANT STYLES --- */
+      @keyframes assistant-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+      @keyframes assistant-enter {
+        from { transform: translateY(100px) scale(0.8); opacity: 0; }
+        to { transform: translateY(0) scale(1); opacity: 1; }
+      }
+      .assistant-enter-animate {
+        animation: assistant-enter 0.5s 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      }
+      
+      .assistant-waveform {
+        position: absolute;
+        inset: -10px;
+        border-radius: 50%;
+        border: 2px solid rgba(229, 9, 20, 0.5);
+        animation: assistant-waveform-pulse 1.5s infinite ease-out;
+        opacity: 0;
+      }
+      @keyframes assistant-waveform-pulse {
+        0% { transform: scale(0.9); opacity: 0; }
+        50% { opacity: 1; }
+        100% { transform: scale(1.4); opacity: 0; }
+      }
+
+      .chat-window-enter {
+        animation: chat-window-enter-anim 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      }
+      @keyframes chat-window-enter-anim {
+        from { opacity: 0; transform: translateY(20px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      .message-enter {
+        animation: message-enter-anim 0.3s ease-out forwards;
+      }
+      @keyframes message-enter-anim {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
     </style>
   <script type="importmap">
