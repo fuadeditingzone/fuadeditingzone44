@@ -33,16 +33,12 @@ export interface Service {
 export type PortfolioTab = 'graphic' | 'vfx';
 export type VfxSubTab = 'anime' | 'vfxEdits';
 
-export type ChatMessage = {
-  id: string;
-  sender: 'bot' | 'user';
-  text: string;
-  isFinal: boolean;
-};
-
+// Fix: Add missing type definitions for the Chat component.
 export type Language = 'en' | 'bn' | 'hi' | 'ur';
 
-export interface GenAIBlob {
-  data: string;
-  mimeType: string;
+export interface ChatMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  isFinal?: boolean;
 }

@@ -12,7 +12,6 @@ interface PortfolioProps {
     setActiveTab: (tab: PortfolioTab) => void;
     activeVfxSubTab: VfxSubTab;
     setActiveVfxSubTab: (subTab: VfxSubTab) => void;
-    onStopBotAudio: () => void;
     onVideoPlaybackChange: (isPlaying: boolean) => void;
 }
 
@@ -129,7 +128,7 @@ const VfxVideoPlayer: React.FC<{
     );
 };
 
-export const Portfolio: React.FC<PortfolioProps> = ({ openModal, isReflecting, activeTab, setActiveTab, activeVfxSubTab, setActiveVfxSubTab, onStopBotAudio, onVideoPlaybackChange }) => {
+export const Portfolio: React.FC<PortfolioProps> = ({ openModal, isReflecting, activeTab, setActiveTab, activeVfxSubTab, setActiveVfxSubTab, onVideoPlaybackChange }) => {
     const [ref, isVisible] = useIntersectionObserver({ threshold: 0.1, triggerOnce: true });
     const animationClass = isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10';
     const titleRef = useRef<HTMLHeadingElement>(null);
@@ -160,9 +159,6 @@ export const Portfolio: React.FC<PortfolioProps> = ({ openModal, isReflecting, a
 
 
     const handlePlayRequest = (videoId: number) => {
-        if (playingVideoId !== videoId) { // It's a new video
-            onStopBotAudio();
-        }
         setPlayingVideoId(prevId => (prevId === videoId ? null : videoId));
     };
 
@@ -200,7 +196,6 @@ export const Portfolio: React.FC<PortfolioProps> = ({ openModal, isReflecting, a
                 <button
                     key={video.id}
                     onClick={() => {
-                        onStopBotAudio();
                         openModal(videos, index);
                     }}
                     className={`image-sound-hover group relative overflow-hidden rounded-lg shadow-lg shadow-black/40 aspect-video focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0d0d0d] focus:ring-[#e50914] ${isReflecting ? 'lightning-reflect' : ''}`}

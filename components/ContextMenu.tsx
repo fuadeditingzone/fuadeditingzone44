@@ -9,7 +9,6 @@ interface ContextMenuProps {
   onClose: () => void;
   onQuickAction: (service: Service) => void;
   onGalleryOpen: () => void;
-  chatButtonRect: DOMRect | null;
 }
 
 const mainServices = ALL_SERVICES.filter(s => s.isMain);
@@ -21,7 +20,7 @@ const getServiceIcon = (serviceName: string) => {
     return null;
 };
 
-export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, onQuickAction, onGalleryOpen, chatButtonRect }) => {
+export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, onQuickAction, onGalleryOpen }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ x, y, opacity: 0 });
 
@@ -37,28 +36,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, onQuick
             if (y + offsetHeight > innerHeight - 10) {
                 newY = y - offsetHeight;
             }
-            // Avoid chat button overlap
-            if (chatButtonRect) {
-                const collides = (
-                    newX < chatButtonRect.right &&
-                    newX + offsetWidth > chatButtonRect.left &&
-                    newY < chatButtonRect.bottom &&
-                    newY + offsetHeight > chatButtonRect.top
-                );
-                if(collides) {
-                    newY = chatButtonRect.top - offsetHeight - 10;
-                    // Re-check window boundary after moving
-                     if (newY < 10) {
-                        newY = chatButtonRect.bottom + 10;
-                    }
-                    if (newX + offsetWidth > innerWidth - 10) {
-                        newX = chatButtonRect.left - offsetWidth - 10;
-                    }
-                }
-            }
             setPosition({ x: newX, y: newY, opacity: 1 });
         }
-    }, [x, y, chatButtonRect]);
+    }, [x, y]);
 
     return (
         <div
