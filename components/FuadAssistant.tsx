@@ -114,8 +114,6 @@ const ThinkingIndicator = React.memo(() => {
 });
 
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
 export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -126,7 +124,12 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    
+    // AI Initialization
+    const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
+    const [isReady, setIsReady] = useState(false); // New state to track initialization
+    
     const proactiveMessageQueueRef = useRef<{text: string, id: string}[]>([]);
 
     const initialX = typeof window !== 'undefined' ? window.innerWidth / 2 - 32 : 0;
@@ -145,7 +148,15 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [isChatOpen]);
 
     useEffect(() => {
-        const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI with a natural, cinematic voice.
+        try {
+            const apiKey = process.env.API_KEY;
+            if (!apiKey) {
+                throw new Error("API_KEY environment variable not set.");
+            }
+            const genAI = new GoogleGenAI({ apiKey });
+            aiRef.current = genAI;
+
+            const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
 
@@ -178,21 +189,25 @@ Auto-switch your speaking language based on user input (English, Bangla, Urdu wi
 - Avoid explicit, hateful, or religiously disrespectful words.
 
 Your goal is to be an adaptable guide: formal and professional at first, but ready to become a fun, cinematic, and friendly companion if the user sets that tone.`;
-        
-        chatRef.current = ai.chats.create({
-            model: 'gemini-2.5-flash',
-            config: { systemInstruction },
-        });
+            
+            chatRef.current = genAI.chats.create({
+                model: 'gemini-2.5-flash',
+                config: { systemInstruction },
+            });
+            setIsReady(true);
+        } catch (error) {
+            console.error("Failed to initialize Fuad Assistant's AI. The API key might be missing or invalid.", error);
+        }
     }, []);
 
     const speak = useCallback(async (text: string, messageId: string) => {
-        if (!text.trim()) return;
+        if (!text.trim() || !aiRef.current) return;
         setBotStatus('speaking');
         try {
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             }
-            const response = await ai.models.generateContent({
+            const response = await aiRef.current.models.generateContent({
                 model: "gemini-2.5-flash-preview-tts",
                 contents: [{ parts: [{ text }] }],
                 config: {
@@ -262,6 +277,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
     
     // Welcome Message
     useEffect(() => {
+        if (!isReady) return;
         const welcomeTimer = setTimeout(() => {
             setHasAppeared(true);
             const hasVisited = localStorage.getItem('fuadAssistantVisited');
@@ -276,22 +292,23 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             proactiveSpeakAndDisplay(welcomeMessage);
         }, 1000);
         return () => clearTimeout(welcomeTimer);
-    }, [proactiveSpeakAndDisplay]);
+    }, [isReady, proactiveSpeakAndDisplay]);
 
     // Section Explanations
     const explainedSections = useRef<Set<string>>(new Set());
     const useSectionObserver = (ref: React.RefObject<HTMLDivElement>, sectionName: string, text: string) => {
         const [containerRef, isVisible] = useIntersectionObserver({ threshold: 0.5, triggerOnce: true });
         useEffect(() => {
-            (containerRef as React.MutableRefObject<HTMLDivElement>).current = ref.current!;
+            if (!ref.current) return;
+            (containerRef as React.MutableRefObject<HTMLDivElement>).current = ref.current;
         }, [ref, containerRef]);
         
         useEffect(() => {
-            if (isVisible && hasAppeared && !explainedSections.current.has(sectionName)) {
+            if (isVisible && hasAppeared && !explainedSections.current.has(sectionName) && isReady) {
                 explainedSections.current.add(sectionName);
                 proactiveSpeakAndDisplay(text);
             }
-        }, [isVisible, text, sectionName, proactiveSpeakAndDisplay]);
+        }, [isVisible, text, sectionName, proactiveSpeakAndDisplay, isReady]);
     };
 
     useSectionObserver(sectionRefs.portfolio, 'portfolio', "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨");
@@ -300,7 +317,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
     
     // Process proactive message queue when audio is unlocked by user interaction
     useEffect(() => {
-        if (audioUnlocked) {
+        if (audioUnlocked && isReady) {
             const speakNextInQueue = async () => {
                 if (proactiveMessageQueueRef.current.length === 0 || botStatus !== 'idle') {
                     if (botStatus !== 'idle') {
@@ -318,12 +335,16 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             };
             speakNextInQueue();
         }
-    }, [audioUnlocked, botStatus, speak]);
+    }, [audioUnlocked, botStatus, speak, isReady]);
     
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, botStatus]);
     
+    if (!isReady) {
+        return null;
+    }
+
     return (
         <>
             <div
