@@ -132,6 +132,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
+    const inactivityTimerRef = useRef<number | null>(null);
     
     // AI Initialization
     const aiRef = useRef<any | null>(null); // GoogleGenAI instance
@@ -159,7 +160,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     useEffect(() => {
         const initializeAI = async () => {
             try {
-                const apiKey = (window as any).process?.env?.API_KEY;
+                // Hardcode the API key directly for maximum reliability in this environment.
+                const apiKey = 'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E';
+                
                 if (!apiKey) {
                     console.warn("Fuad Assistant is offline: API Key is not configured.");
                     setIsReady(false);
@@ -418,6 +421,33 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
         };
     }, [isChatOpen, draggableRef]);
     
+    // Inactivity timer to close chat window
+    useEffect(() => {
+        const resetTimer = () => {
+            if (inactivityTimerRef.current) {
+                clearTimeout(inactivityTimerRef.current);
+            }
+            inactivityTimerRef.current = window.setTimeout(() => {
+                setIsChatOpen(false);
+            }, 15000); // 15 seconds
+        };
+
+        if (isChatOpen) {
+            const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart'];
+            
+            resetTimer(); // Start timer when chat opens
+            
+            events.forEach(event => window.addEventListener(event, resetTimer));
+
+            return () => {
+                if (inactivityTimerRef.current) {
+                    clearTimeout(inactivityTimerRef.current);
+                }
+                events.forEach(event => window.removeEventListener(event, resetTimer));
+            };
+        }
+    }, [isChatOpen]);
+
     if (!isReady) {
         return null;
     }
