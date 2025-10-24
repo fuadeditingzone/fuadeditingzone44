@@ -16,7 +16,7 @@ import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
 import { FuadAssistant } from './components/FuadAssistant';
 import { LoginModal } from './components/LoginModal';
-import { SearchResultsModal } from './components/SearchResultsModal';
+import { EditProfileModal } from './components/EditProfileModal';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
 const AUDIO_SOURCES = {
@@ -29,6 +29,7 @@ const AUDIO_SOURCES = {
   imageHover2: { src: 'https://www.dropbox.com/scl/fi/nwskelkksaqzp5pw1ov6s/ui-sounds-pack-5-14-359755.mp3?rlkey=aarm0y1cmotx2yek37o6mkzoi&dl=1', volume: 0.4, loop: false },
   mouseMove: { src: 'https://www.dropbox.com/scl/fi/eyhzvfq43cgzydnr1p16z/swoosh-016-383771.mp3?rlkey=ue4q0kt7rsmyxuiz6kwefsebw&dl=1', volume: 0.2, loop: false },
   storm: { src: 'https://www.dropbox.com/scl/fi/9q8t5vi7a81a4m8nb32gb/sounds-of-a-storm-with-wind-and-thunder-375923.mp3?rlkey=sqdjlw8dwilbg7zlwar1o5n7l&dl=1', volume: 0.6, loop: false },
+  welcomeExit: { src: 'https://www.dropbox.com/scl/fi/cosps94ob7q539morzdo9/ui-sounds-pack-2-sound-5-358890.mp3?rlkey=co0gvw2403tc2ws0dhg9eavbr&st=y564seth&dl=1', volume: 0.5, loop: false },
 };
 
 const safePlay = (mediaPromise: Promise<void> | undefined) => {
@@ -44,19 +45,17 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
 type AppState = 'welcome' | 'entering' | 'entered';
 
 const AppContent = () => {
-  const { currentUser, isLocked, lockSite, findUsers } = useUser();
+  const { currentUser, isLocked, lockSite } = useUser();
   const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [excessiveMovement, setExcessiveMovement] = useState(0);
   const [isParallaxActive, setIsParallaxActive] = useState(true);
 
   // Modal States
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isSearchResultsModalOpen, setIsSearchResultsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
 
   const sections = { home: useRef<HTMLDivElement>(null), portfolio: useRef<HTMLDivElement>(null), contact: useRef<HTMLDivElement>(null), about: useRef<HTMLDivElement>(null) };
@@ -65,7 +64,7 @@ const AppContent = () => {
   const [singleImageViewerState, setSingleImageViewerState] = useState<{ items: GraphicWork[]; currentIndex: number } | null>(null);
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTab>('graphic');
   const [activeVfxSubTab, setActiveVfxSubTab] = useState<VfxSubTab>('anime');
-  const audioRefs = useRef<Record<keyof typeof AUDIO_SOURCES, HTMLAudioElement | null>>({ background: null, hover: null, click: null, profileClick: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null });
+  const audioRefs = useRef<Record<keyof typeof AUDIO_SOURCES, HTMLAudioElement | null>>({ background: null, hover: null, click: null, profileClick: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null, welcomeExit: null });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const audioContextStarted = useRef(false);
@@ -81,11 +80,26 @@ const AppContent = () => {
   const profileSfxRef = useRef<HTMLAudioElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState(-1);
 
+  const startBackgroundAudio = useCallback(() => {
+    if (audioContextStarted.current) return;
+    audioContextStarted.current = true;
+    const backgroundAudio = audioRefs.current.background;
+    const playPromise = backgroundAudio?.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            if ((error as DOMException).name !== 'AbortError') {
+                console.log("Audio autoplay prevented by browser. Will start on user interaction.", error);
+                audioContextStarted.current = false;
+            }
+        });
+    } else { audioContextStarted.current = false; }
+  }, []);
+  
   const handleEnter = useCallback(() => {
+    safePlay(audioRefs.current.welcomeExit?.play());
     setAppState('entering');
     startBackgroundAudio(); 
-    setAudioUnlocked(true);
-  }, []);
+  }, [startBackgroundAudio]);
 
   useEffect(() => {
     if (appState === 'entering') {
@@ -105,15 +119,8 @@ const AppContent = () => {
     return () => clearTimeout(timer);
   }, [currentUser, isLocked, lockSite, appState]);
 
-  const handleSearch = (query: string) => {
-      const results = findUsers(query);
-      setSearchResults(results);
-      setIsSearchResultsModalOpen(true);
-  };
-
   const viewProfile = (user: User) => {
       setViewingUser(user);
-      setIsSearchResultsModalOpen(false);
       setIsProfileModalOpen(true);
   };
 
@@ -124,21 +131,6 @@ const AppContent = () => {
         sectionElement.scrollIntoView({ behavior: 'smooth' });
     }
   }, [sections]);
-
-  const startBackgroundAudio = useCallback(() => {
-    if (audioContextStarted.current) return;
-    audioContextStarted.current = true;
-    const backgroundAudio = audioRefs.current.background;
-    const playPromise = backgroundAudio?.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            if ((error as DOMException).name !== 'AbortError') {
-                console.log("Audio autoplay prevented.", error);
-                audioContextStarted.current = false;
-            }
-        });
-    } else { audioContextStarted.current = false; }
-  }, []);
 
   useEffect(() => { 
     Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); 
@@ -304,7 +296,7 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isLoginModalOpen, isSearchResultsModalOpen, isProfileModalOpen]);
+  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isProfileModalOpen || isEditProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isLoginModalOpen, isProfileModalOpen, isEditProfileModalOpen]);
   
   useEffect(() => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
@@ -413,7 +405,7 @@ const AppContent = () => {
             onScrollTo={scrollToSection} 
             onLoginClick={() => setIsLoginModalOpen(true)}
             onViewProfile={viewProfile}
-            onSearch={handleSearch}
+            onEditProfile={() => setIsEditProfileModalOpen(true)}
             isReflecting={isReflecting} 
         />
         <main>
@@ -433,7 +425,7 @@ const AppContent = () => {
         {appState === 'entered' && (
           <FuadAssistant 
             sectionRefs={sections} 
-            audioUnlocked={audioUnlocked} 
+            audioUnlocked={audioContextStarted.current} 
             isProfileCardOpen={isProfileModalOpen} 
             onExcessiveMovement={excessiveMovement} 
             user={currentUser} 
@@ -450,8 +442,8 @@ const AppContent = () => {
 
       {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={() => { setIsProfileModalOpen(false); setViewingUser(null); }} />}
       {isLoginModalOpen && <LoginModal onClose={() => setIsLoginModalOpen(false)} onRegisterSuccess={handleRegisterSuccess} />}
-      {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
-
+      {isEditProfileModalOpen && <EditProfileModal onClose={() => setIsEditProfileModalOpen(false)} />}
+      
       {isLocked && !isLoginModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
       )}

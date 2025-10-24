@@ -304,14 +304,15 @@
       .message-enter { animation: message-enter-anim 0.3s ease-out forwards; }
       @keyframes message-enter-anim { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-      /* Custom Scrollbar for Chat Window */
-      .chat-messages-container { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 0.3s ease-out; }
-      .chat-messages-container:hover { scrollbar-color: rgba(229, 9, 20, 0.5) transparent; }
-      .chat-messages-container::-webkit-scrollbar { width: 8px; }
-      .chat-messages-container::-webkit-scrollbar-track { background: transparent; }
-      .chat-messages-container::-webkit-scrollbar-thumb { background-color: transparent; border-radius: 10px; border: 2px solid transparent; background-clip: content-box; transition: background-color 0.3s ease-out; }
-      .chat-messages-container:hover::-webkit-scrollbar-thumb { background-color: rgba(229, 9, 20, 0.5); }
-      .chat-messages-container::-webkit-scrollbar-thumb:hover { background-color: rgba(229, 9, 20, 0.8); }
+      /* Universal Custom Scrollbar */
+      .custom-scrollbar { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 0.3s ease-out; }
+      .custom-scrollbar:hover { scrollbar-color: rgba(229, 9, 20, 0.5) transparent; }
+      .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background-color: transparent; border-radius: 10px; border: 2px solid transparent; background-clip: content-box; transition: background-color 0.3s ease-out; }
+      .custom-scrollbar:hover::-webkit-scrollbar-thumb { background-color: rgba(229, 9, 20, 0.5); }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(229, 9, 20, 0.8); }
+      .chat-messages-container { /* Inherits from .custom-scrollbar if needed, but specific class kept for targeting */ }
 
       /* System Cursor Styles */
       body.system-cursor-active { cursor: default !important; }

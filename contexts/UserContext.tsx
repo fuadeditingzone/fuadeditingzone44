@@ -4,12 +4,11 @@ import type { User } from '../types';
 interface UserContextType {
     currentUser: User | null;
     isLocked: boolean;
-    register: (userData: User) => User | null;
+    register: (userData: Omit<User, 'profileLastUpdatedAt' | 'usernameLastUpdatedAt'>) => User | null;
+    updateUser: (updatedData: Partial<User>) => boolean;
     logout: () => void;
     lockSite: () => void;
-    isUsernameTaken: (username: string) => boolean;
-    findUsers: (query: string) => User[];
-    getUserByUsername: (username: string) => User | undefined;
+    isUsernameTaken: (username: string, currentUsername?: string) => boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -60,23 +59,58 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }
 
-    const isUsernameTaken = useCallback((username: string) => {
-        return !!users[username.toLowerCase()];
+    const isUsernameTaken = useCallback((username: string, currentUsername?: string) => {
+        const usernameLower = username.toLowerCase();
+        if (currentUsername && currentUsername.toLowerCase() === usernameLower) {
+            return false;
+        }
+        return !!users[usernameLower];
     }, [users]);
 
-    const register = useCallback((userData: User): User | null => {
+    const register = useCallback((userData: Omit<User, 'profileLastUpdatedAt' | 'usernameLastUpdatedAt'>): User | null => {
         const usernameLower = userData.username.toLowerCase();
         if (isUsernameTaken(usernameLower)) {
             return null;
         }
-        const updatedUsers = { ...users, [usernameLower]: userData };
+        const now = Date.now();
+        const newUser: User = { ...userData, profileLastUpdatedAt: now, usernameLastUpdatedAt: now };
+        const updatedUsers = { ...users, [usernameLower]: newUser };
+        
         setUsers(updatedUsers);
-        setCurrentUser(userData);
+        setCurrentUser(newUser);
         persistUsers(updatedUsers);
-        persistCurrentUser(userData);
+        persistCurrentUser(newUser);
         setIsLocked(false);
-        return userData;
+        return newUser;
     }, [users, isUsernameTaken]);
+
+    const updateUser = useCallback((updatedData: Partial<User>): boolean => {
+        if (!currentUser) return false;
+
+        const oldUsernameLower = currentUser.username.toLowerCase();
+        const newUsernameLower = updatedData.username ? updatedData.username.toLowerCase() : oldUsernameLower;
+
+        const updatedUser: User = { ...currentUser, ...updatedData };
+        if (updatedData.username) {
+            updatedUser.usernameLastUpdatedAt = Date.now();
+        }
+        if (updatedData.name || updatedData.profession || updatedData.bio || updatedData.role) {
+            updatedUser.profileLastUpdatedAt = Date.now();
+        }
+        
+        const updatedUsers = { ...users };
+        // If username changed, update the key in the database
+        if (oldUsernameLower !== newUsernameLower) {
+            delete updatedUsers[oldUsernameLower];
+        }
+        updatedUsers[newUsernameLower] = updatedUser;
+
+        setUsers(updatedUsers);
+        setCurrentUser(updatedUser);
+        persistUsers(updatedUsers);
+        persistCurrentUser(updatedUser);
+        return true;
+    }, [currentUser, users]);
 
     const logout = useCallback(() => {
         setCurrentUser(null);
@@ -88,30 +122,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLocked(true);
         }
     }, [currentUser]);
-
-    const findUsers = useCallback((query: string) => {
-        if (!query) return [];
-        const queryLower = query.toLowerCase();
-        return Object.values(users).filter((user: User) => 
-            user.username.toLowerCase().includes(queryLower) ||
-            user.name.toLowerCase().includes(queryLower)
-        );
-    }, [users]);
-
-    const getUserByUsername = useCallback((username: string) => {
-        return users[username.toLowerCase()];
-    }, [users]);
-
+    
     const value = useMemo(() => ({
         currentUser,
         isLocked: isInitialized && isLocked && !currentUser,
         register,
+        updateUser,
         logout,
         lockSite,
         isUsernameTaken,
-        findUsers,
-        getUserByUsername
-    }), [currentUser, isLocked, register, logout, lockSite, isUsernameTaken, findUsers, getUserByUsername, isInitialized]);
+    }), [currentUser, isLocked, register, updateUser, logout, lockSite, isUsernameTaken, isInitialized]);
 
     return (
         <UserContext.Provider value={value}>

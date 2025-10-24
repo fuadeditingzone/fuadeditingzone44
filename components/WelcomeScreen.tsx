@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 interface WelcomeScreenProps {
     onEnter: () => void;
@@ -6,13 +6,49 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
     const [showVortex, setShowVortex] = useState(true);
+    const onEnterCalledRef = useRef(false);
+
+    // Use useCallback to ensure the function identity is stable for useEffect dependencies
+    const triggerEnter = useCallback(() => {
+        if (!onEnterCalledRef.current) {
+            onEnterCalledRef.current = true;
+            onEnter();
+        }
+    }, [onEnter]);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
+        const vortexTimer = setTimeout(() => {
             setShowVortex(false);
         }, 1500); // Vortex animation duration
-        return () => clearTimeout(timer);
-    }, []);
+
+        // Fallback timer if the user doesn't interact
+        const enterTimer = setTimeout(() => {
+            triggerEnter();
+        }, 5500);
+
+        // This handler will be called on the first user interaction
+        const handleInteraction = () => {
+            triggerEnter();
+        };
+
+        // Add event listeners that fire only once to skip the intro
+        window.addEventListener('mousedown', handleInteraction, { once: true });
+        window.addEventListener('touchstart', handleInteraction, { once: true });
+        window.addEventListener('wheel', handleInteraction, { once: true });
+        window.addEventListener('keydown', handleInteraction, { once: true });
+
+        // Cleanup function to clear timers if the component unmounts
+        return () => {
+            clearTimeout(vortexTimer);
+            clearTimeout(enterTimer);
+            // 'once' listeners remove themselves, but it's good practice to have this
+            // in case the logic changes in the future.
+            window.removeEventListener('mousedown', handleInteraction);
+            window.removeEventListener('touchstart', handleInteraction);
+            window.removeEventListener('wheel', handleInteraction);
+            window.removeEventListener('keydown', handleInteraction);
+        };
+    }, [triggerEnter]);
 
     return (
         <div className="welcome-screen fixed inset-0 z-[100]">
@@ -25,12 +61,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
                         <p className="max-w-xl mx-auto mt-4 text-base md:text-lg text-gray-300 font-inter">
                             Welcome to the creative dimension of Fuad Editing Zone.
                         </p>
-                        <button 
-                            onClick={onEnter}
-                            className="mt-8 btn-glow bg-[#e50914] text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105"
-                        >
-                            Enter Zone
-                        </button>
                     </div>
                 </div>
             )}

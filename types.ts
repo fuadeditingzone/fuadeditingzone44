@@ -49,4 +49,6 @@ export interface User {
   profession: string;
   role: 'client' | 'designer';
   bio: string;
+  profileLastUpdatedAt?: number;
+  usernameLastUpdatedAt?: number;
 }

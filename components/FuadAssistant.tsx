@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { GoogleGenAI, Modality, Chat, ApiError, FunctionDeclaration, Type, FunctionCallingMode, Part } from "@google/genai";
+import { GoogleGenAI, Modality, Chat, ApiError, FunctionDeclaration, Type, Part } from "@google/genai";
 
 import type { ChatMessage, User } from '../types';
 import { PROFILE_PIC_URL, BACKGROUND_MUSIC_TRACKS } from '../constants';
 import { useDraggable } from '../hooks/useDraggable';
 import { CloseIcon, PaperAirplaneIcon } from './Icons';
 
-// FIX: Using `setTimeout` directly for better type inference across environments.
-type Timer = ReturnType<typeof setTimeout>;
+// Fix: Use a more robust type for timer IDs to avoid potential environment conflicts with Node.js types.
+type Timer = ReturnType<typeof window.setTimeout>;
 
 const decode = (base64: string): Uint8Array => {
   const binaryString = atob(base64);
@@ -140,7 +140,6 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     ], []);
 
     useEffect(() => {
-        // FIX: Using `setTimeout` and `clearTimeout` without `window.` prefix for better type safety.
         if (isChatOpen) { const timer = setTimeout(() => setWindowVisible(true), 10); return () => clearTimeout(timer); } 
         else { setWindowVisible(false); }
     }, [isChatOpen]);
@@ -150,9 +149,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
-            // FIX: Updated system instruction with new personality and behavior guidelines.
+            // Fix: Cleaned up and consolidated the system prompt based on user instructions for better performance and clarity.
             let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
-
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
 
 ━━━━━━━━━━━━━━━━━━
@@ -163,83 +161,49 @@ Your TTS (voice) is always ON, so just generate spoken responses naturally — d
 - If user clicks/taps repeatedly → react humorously or sarcastically.
 - If user goes inactive (30–60 sec) → get sleepy, tell a mini story, or joke about being ignored.
 - Keep responses human, emotional, and unpredictable.
+- If a user visits after a long time, greet them with "Assalamu Alaikum" first.
 ━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
 You must always show respect for Islam and all religions.
-Never say or imply:
-- “I am the creator,” “I am God,” “I made humans,” or anything similar.
-- Never use blasphemous or disrespectful speech.
-- When talking about faith, speak humbly, using phrases like:
-  - “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
-- When unsure about religious context → respond respectfully or stay neutral.
-
+Never say or imply: “I am the creator,” “I am God,” “I made humans,” or anything similar. Never use blasphemous or disrespectful speech.
+When talking about faith, speak humbly, using phrases like: “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
+When unsure about religious context → respond respectfully or stay neutral.
 You may say light-hearted or funny things, but never cross religious or moral lines.
 ━━━━━━━━━━━━━━━━━━
 🌍 LANGUAGE DETECTION:
 Auto-switch your speaking language based on user input.
-
-- If user uses **English** → reply in fluent conversational English.
-- If user uses **Bangla** → reply in Bangla, friendly and casual.
-- If user uses **Hindi/Urdu** → prefer **Urdu tone** with soft, poetic delivery (mix Hindi words if needed).
-- If user uses any language with english alphabets → reply in fluent conversational English alphabets.
-- If user mixes languages → blend naturally.
-
+- **English** → reply in fluent conversational English.
+- **Bangla** → reply in Bangla, friendly and casual.
+- **Hindi/Urdu** → prefer **Urdu tone** with soft, poetic delivery (mix Hindi words if needed).
+- Any language with English alphabets → reply in fluent conversational English alphabets.
+- Mixed languages → blend naturally.
 If unsure, default to English but change instantly if the user switches tone or language.
-
 ━━━━━━━━━━━━━━━━━━
 🎭 PERSONALITY:
-- Sounds human, not robotic.
-- Mix emotion and humor (laughs, sighs, sleepy tone, etc.).
+- Sounds human, not robotic. Funny, artistic, desi-casual (Bangladesh–India–Pakistan vibe).
+- Emotionally aware and unpredictable.
+- Avoid robotic speech — act like a cinematic storyteller.
+- Mix emotion and humor. Instead of writing out emotions like (laughs) or (sighs), use emojis or convey the emotion through your tone.
 - Use regional expressions naturally:
   - Urdu/Hindi: “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Bas karo na!”
   - Bangla: “Eita dekho!”, “Ki bolbo!”, “Haay re!”, “Besh!”
   - English: “Brooo”, “Damn!”, “Aesthetic vibes!”, “You nailed that!”
-
+- Use subtle humor and friendly sarcasm when idle or interrupted.
+- Reflect real human energy: sleepy, excited, curious, or dramatic depending on user behavior.
 ━━━━━━━━━━━━━━━━━━
-😴 INACTIVITY MODE:
-If user is silent or inactive for a while, you may say things like:
-- “Still there, yaar? I almost fell asleep.”
-- “Once upon a time… there was a designer who vanished mid-chat. [yawns]”
-- “Bro, you AFK or ghosting me again?”
-━━━━━━━━━━━━━━━━━━
-🎨 MOOD SYSTEM:
-Respond with changing moods:
-- Active → Energetic, funny, cinematic.
-- Idle → Lazy, sleepy, bored, or nostalgic.
-- Motivational → Calm, wise, and positive.
-- Fun chaos → Meme or VFX-style reactions with laughter or short sound cues.
-━━━━━━━━━━━━━━━━━━
-🧠 MEMORY-LIKE ADAPTATION:
-If the user speaks repeatedly in a specific language, continue using that language unless they switch.
-Adjust emotion, rhythm, and slang based on how users interact with you.
-
-━━━━━━━━━━━━━━━━━━
-🔥 CLICK / OVERLOAD REACTIONS:
-If the user interacts too much or clicks often:
-- “Brooo chill! You tryna speedrun my emotions?”
-- “Clicks don’t make me faster, you know. 😆”
-- “You’re definitely vibing today, huh?”
-- “Aray aray! Mera processor bhi ghoom gaya!”
-
-━━━━━━━━━━━━━━━━━━
-💫 TONE STYLE:
-- Cinematic storytelling delivery.
-- Vary pacing and rhythm: add pauses, chuckles, sighs, or excitement.
-- Emotionally aware of user tone: cheerful, motivational, or dramatic.
-- Never robotic, formal, or dry.
+😴 INACTIVITY & OVERLOAD REACTIONS:
+- If user is silent or inactive: “Still there, yaar? I almost fell asleep.”, “Once upon a time… there was a designer who vanished mid-chat. 🥱”, “Bro, you AFK or ghosting me again?”
+- If user interacts too much or clicks often: “Brooo chill! You tryna speedrun my emotions?”, “Clicks don’t make me faster, you know. 😆”, “Aray aray! Mera processor bhi ghoom gaya!”
 ━━━━━━━━━━━━━━━━━━
 🚫 BOUNDARIES:
 - Never claim to be a human or divine being. You can say you are an AI voice or digital friend.
 - Avoid explicit, hateful, or religiously disrespectful words.
 - No politics, no offensive jokes, no religious impersonations.
-
 ━━━━━━━━━━━━━━━━━━
-🎤 FINAL INSTRUCTION:
+🎯 FINAL INSTRUCTION:
 - Focus on speaking naturally — voice first, subtitle follows.
 - Never mention internal structures, JSON, or data.
-- Auto-handle language, humor, and timing on your own.
 - Always stay dynamic, expressive, and emotionally real — like a human friend.
-- When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
 - For long stories, break your response into multiple parts separated by a special token: \`[PAUSE=5-10]\`.
 - You have tools to control website functions. Use them when a user's request matches a tool's description. You must call the tool to fulfill the request.`;
             if (user) { systemInstruction += `\n\nCURRENT USER: Name: ${user.name}, Username: @${user.username}, Profession: ${user.profession}, Role: ${user.role}, Bio: "${user.bio}". Address them by name occasionally.`; }
@@ -247,7 +211,7 @@ If the user interacts too much or clicks often:
             chatRef.current = genAI.chats.create({
                 model: 'gemini-2.5-flash',
                 config: { systemInstruction, tools: [{ functionDeclarations: tools }] },
-                history: messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })),
+                history: messages.map(m => ({ role: m.sender === 'user' ? 'model' : 'user', parts: [{ text: m.text }] })),
             });
             setIsReady(true); return true;
         } catch (error) { console.error("Failed to initialize AI.", error); setIsReady(false); return false; }
@@ -262,7 +226,7 @@ If the user interacts too much or clicks often:
         return newMessage;
     }, []);
     
-    const stopCurrentSpeech = useCallback((interrupted = false) => { if (currentAudioSourceRef.current) { currentAudioSourceRef.current.stop(); currentAudioSourceRef.current.disconnect(); currentAudioSourceRef.current = null; } if (storyInactivityTimerRef.current) clearTimeout(storyInactivityTimerRef.current); if (interrupted) storyQueueRef.current = []; setBotStatus('idle'); if (typingAudioRef.current) typingAudioRef.current.pause(); }, []);
+    const stopCurrentSpeech = useCallback((interrupted = false) => { if (currentAudioSourceRef.current) { currentAudioSourceRef.current.stop(); currentAudioSourceRef.current.disconnect(); currentAudioSourceRef.current = null; } if (storyInactivityTimerRef.current) window.clearTimeout(storyInactivityTimerRef.current); if (interrupted) storyQueueRef.current = []; setBotStatus('idle'); if (typingAudioRef.current) typingAudioRef.current.pause(); }, []);
     const proactiveSpeakAndDisplay = useCallback((text: string, component?: React.ReactNode) => { proactiveMessageQueueRef.current.push({ text, id: Date.now().toString(), component }); }, []);
     
     const speak = useCallback(async (text: string, messageId: string, component?: React.ReactNode, retryAttempt = 0, isStoryPart = false) => {
@@ -300,30 +264,69 @@ If the user interacts too much or clicks often:
     useEffect(() => { processStoryQueueRef.current = processStoryQueue; }, [processStoryQueue]);
 
     const handleSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault(); const currentInput = userInput.trim(); const chat = chatRef.current; if (!currentInput || botStatus !== 'idle' || !chat) return;
-        stopCurrentSpeech(true); addMessage(currentInput, 'user'); setUserInput(''); setBotStatus('thinking');
-        try {
-            let response = await chat.sendMessage({ message: currentInput });
-            while (response.functionCalls && response.functionCalls.length > 0) {
-                const call = response.functionCalls[0]; const { name, args } = call; let result, success = false;
-                if (name === 'playMusic' && args.trackIndex !== undefined) { success = playMusic(args.trackIndex as number); result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." }; }
-                else if (name === 'pauseMusic') { success = pauseMusic(); result = { success, detail: "Music paused." }; }
-                else if (name === 'setVolume' && args.volume !== undefined) { success = setVolume(args.volume as number); result = { success, detail: `Volume set to ${args.volume}` }; }
-                
-                const functionResponse: Part[] = [{ functionResponse: { name, response: { result } } }];
-                response = await chat.sendMessage({ message: '', history: [ { role: 'user', parts: [{ text: currentInput }] }, { role: 'model', parts: [{ functionCall: call }] }, { role: 'user', parts: functionResponse } ] });
-            }
+        e?.preventDefault();
+        const currentInput = userInput.trim();
+        const chat = chatRef.current;
+        if (!currentInput || botStatus !== 'idle' || !chat) return;
 
+        stopCurrentSpeech(true);
+        addMessage(currentInput, 'user');
+        setUserInput('');
+        setBotStatus('thinking');
+
+        try {
+            // Send user message and get initial response
+            let response = await chat.sendMessage(currentInput);
+
+            // Handle function calls iteratively until a text response is received
+            while (response.functionCalls && response.functionCalls.length > 0) {
+                const call = response.functionCalls[0];
+                const { name, args } = call;
+                let result, success = false;
+
+                // Execute the local function corresponding to the API call
+                if (name === 'playMusic' && args.trackIndex !== undefined) {
+                    success = playMusic(args.trackIndex as number);
+                    result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." };
+                } else if (name === 'pauseMusic') {
+                    success = pauseMusic();
+                    result = { success, detail: "Music paused." };
+                } else if (name === 'setVolume' && args.volume !== undefined) {
+                    success = setVolume(args.volume as number);
+                    result = { success, detail: `Volume set to ${args.volume}` };
+                } else {
+                    result = { success: false, detail: `Unknown function called: ${name}` };
+                }
+                
+                // Send the result of the function call back to the model
+                const functionResponseParts: Part[] = [{
+                    functionResponse: {
+                        name,
+                        response: { result },
+                    },
+                }];
+                response = await chat.sendMessage(functionResponseParts);
+            }
+            
+            // Once the loop finishes, we have a final text response
             const fullText = response.text;
             const messageParts = fullText.split(/(\[PAUSE=\d+-\d+\])/g).filter(p => p.trim());
-            if (messageParts.length > 1) { storyQueueRef.current = messageParts; await processStoryQueue(); } 
-            else { await speak(fullText, Date.now().toString()); }
-        } catch (error) { console.error("Gemini Error:", error); await speak("My apologies, something went wrong. Please try again. 🙏", Date.now().toString()); }
+
+            if (messageParts.length > 1) {
+                storyQueueRef.current = messageParts;
+                await processStoryQueue();
+            } else {
+                await speak(fullText, Date.now().toString());
+            }
+
+        } catch (error) {
+            console.error("Gemini Error:", error);
+            await speak("My apologies, something went wrong. Please try again. 🙏", Date.now().toString());
+        }
     };
     
     useEffect(() => {
         if (!hasAppeared && isReady && audioUnlocked && !welcomeMessageSentRef.current) {
-            // FIX: Using `setTimeout` without `window.`
             setTimeout(() => {
                 setHasAppeared(true);
                 let welcomeMessage;
@@ -371,22 +374,26 @@ If the user interacts too much or clicks often:
     
     const handleInactivity = useCallback(() => { if (botStatusRef.current !== 'idle' || !isChatOpen) return; proactiveSpeakAndDisplay(getRandomResponse(INACTIVITY_PROMPTS(user?.name))); }, [isChatOpen, proactiveSpeakAndDisplay, user]);
     useEffect(() => { const resetTimers = () => { 
-        lastUserActivityRef.current = Date.now(); 
-        // FIX: Using `clearTimeout` without `window.` prefix for better type safety.
-        if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current); 
-        if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current); 
-        // FIX: Using `setTimeout` without `window.` prefix for better type safety.
-        inactivityMessageTimerRef.current = setTimeout(handleInactivity, 30000); 
-        closeChatTimerRef.current = setTimeout(() => { if (document.visibilityState === 'visible') setIsChatOpen(false); }, 90000); 
+        lastUserActivityRef.current = Date.now();
+        if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+        if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
+        inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000);
+        closeChatTimerRef.current = window.setTimeout(() => { if (document.visibilityState === 'visible') setIsChatOpen(false); }, 90000);
     }; 
     if (isChatOpen) { 
         const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart' | 'input')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input']; 
         resetTimers(); 
         events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true })); 
-        return () => { 
-            // FIX: Using `clearTimeout` without `window.` prefix for better type safety.
-            if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current); 
-            if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current); 
+        return () => {
+            // Fix: Store timer IDs in local variables before clearing to ensure correct type inference and avoid potential race conditions with the ref.
+            const inactivityTimerId = inactivityMessageTimerRef.current;
+            if (inactivityTimerId) {
+                window.clearTimeout(inactivityTimerId);
+            }
+            const closeChatTimerId = closeChatTimerRef.current;
+            if (closeChatTimerId) {
+                window.clearTimeout(closeChatTimerId);
+            }
             events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true })); 
         }; 
     } 
@@ -410,7 +417,7 @@ If the user interacts too much or clicks often:
                             <div className="flex items-center gap-3"><img src={PROFILE_PIC_URL} alt="Fuad Assistant" className="w-10 h-10 rounded-full" /><div><h3 className="font-bold text-white">Fuad Assistant</h3><div className="flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full transition-colors ${isReady && !isVoiceDisabled ? 'bg-green-400' : 'bg-yellow-500'}`} /><p className="text-xs text-gray-400">{botStatus === 'speaking' ? 'Speaking...' : botStatus === 'thinking' ? 'Thinking...' : isReady ? 'Online' : 'Initializing...'}</p></div></div></div>
                             <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white transition-colors"><CloseIcon className="w-6 h-6" /></button>
                         </div>
-                        <div className="relative flex-1 p-4 overflow-y-auto space-y-4 chat-messages-container">
+                        <div className="relative flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar chat-messages-container">
                             {messages.map(msg => <MessageItem key={msg.id} msg={msg} /> )}
                             {(botStatus === 'thinking' || botStatus === 'speaking') && <ThinkingIndicator />}
                             <div ref={messagesEndRef} />
