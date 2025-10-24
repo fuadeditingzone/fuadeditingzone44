@@ -159,7 +159,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     useEffect(() => {
         const initializeAI = async () => {
             try {
-                const apiKey = process.env.API_KEY;
+                const apiKey = (window as any).process?.env?.API_KEY;
                 if (!apiKey) {
                     console.warn("Fuad Assistant is offline: API Key is not configured.");
                     setIsReady(false);
