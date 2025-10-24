@@ -43,6 +43,72 @@ const API_KEYS = [
 
 const ACTIVE_API_KEY = API_KEYS[0];
 
+// --- Response Banks for Variety ---
+const WELCOME_MESSAGES_FIRST_TIME = [
+    "Assalamu Alaikum! I am Fuad, your AI guide for this creative zone. It is a pleasure to have you here. Please feel free to explore my work or ask any questions you may have. 🙏",
+    "Welcome! I'm Fuad, the AI assistant for this portfolio. Glad you could make it. Have a look around, and don't hesitate to ask me anything! ✨",
+    "Hey there! Welcome to the zone. I'm Fuad, your AI companion. Let's explore some cool designs and edits together, shall we? 🚀"
+];
+
+const WELCOME_MESSAGES_RETURN = [
+    "Assalamu Alaikum! Welcome back, it's wonderful to see you again. Let me know if there's anything I can help you with today. ✨",
+    "Hey, you're back! Good to see you again. Ready to dive back into the creative world? 🎨",
+    "Welcome back! The place wasn't the same without you. What's on your mind today? 😉"
+];
+
+const EXCESSIVE_MOVEMENT_RESPONSES = [
+    "Whoa, slow down there, speed racer! You're making the stars dizzy!",
+    "Bro, you trying to create a black hole with all that movement?",
+    "Aray wah! Someone's full of energy today! Chill, yaar!",
+    "Easy there, The Flash! Are you testing the light speed of your mouse? ⚡",
+    "You're scrolling so fast, I think you've just traveled back in time! 🕰️",
+    "Bro, you are on fire today! Your energy is through the roof! 🔥"
+];
+
+const SECTION_EXPLANATIONS = {
+    portfolio: [
+        "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨",
+        "This is where the magic happens! My portfolio showcases all my creative endeavors. Hope you find something that inspires you.",
+        "Welcome to the portfolio section. Feel free to explore the visuals. Each one tells a story."
+    ],
+    contact: [
+        "Should you wish to collaborate or create something amazing together, this is the place. You can find all my social media links here. I look forward to hearing from you, Insha'Allah. 🤝",
+        "Want to connect? Here are all the ways you can reach out. Let's create something awesome together!",
+        "This is my contact section. Don't be a stranger! Drop a message if you have a project in mind or just want to say hi. 👋"
+    ],
+    about: [
+        "Here is a little bit about me. I am Fuad Ahmed, from Sylhet, Bangladesh. I began my journey in this field in 2020, and Alhamdulillah, I am passionate about every project I undertake. 😊",
+        "Curious about the person behind the art? This section tells you a bit about my journey. It all started back in 2020.",
+        "Let me introduce myself. I'm Fuad, the creative mind behind this zone. This is my story."
+    ]
+};
+
+const INTERRUPTION_RESPONSES = [
+    "Umm, okay...",
+    "Oh, alright then. Moving on...",
+    "Never mind that, I guess. Let's see what's here..."
+];
+
+const getRandomResponse = (responses: string[], lastResponseRef?: React.MutableRefObject<string | null>): string => {
+    if (responses.length === 1) {
+        return responses[0];
+    }
+    
+    let availableResponses = responses;
+    if (lastResponseRef?.current && responses.length > 1) {
+        availableResponses = responses.filter(r => r !== lastResponseRef.current);
+    }
+    
+    const randomIndex = Math.floor(Math.random() * availableResponses.length);
+    const selectedResponse = availableResponses[randomIndex];
+    
+    if (lastResponseRef) {
+        lastResponseRef.current = selectedResponse;
+    }
+    
+    return selectedResponse;
+};
+
 
 interface KaraokeTextProps {
     fullText: string;
@@ -144,8 +210,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
     // Fix: Use explicit browser timer ID type for robustness.
-    const inactivityMessageTimerRef = useRef<number | null>(null);
-    const closeChatTimerRef = useRef<number | null>(null);
+    const inactivityMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const closeChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     
     // AI Initialization
     // Fix: Use strongly typed refs for AI instances.
@@ -163,6 +229,12 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     
     const botStatusRef = useRef(botStatus);
     useEffect(() => { botStatusRef.current = botStatus; });
+
+    // Refs to track last used responses to avoid repetition
+    const lastWelcomeRef = useRef<string | null>(null);
+    const lastMovementRef = useRef<string | null>(null);
+    const lastInterruptionRef = useRef<string | null>(null);
+    const lastSectionExplanationRef = useRef<Record<string, string | null>>({});
 
     useEffect(() => {
         let timer: number;
@@ -351,9 +423,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
              setTimeout(() => {
                 setHasAppeared(true);
                 const hasVisited = localStorage.getItem('fuadAssistantVisited');
-                let welcomeMessage = hasVisited
-                    ? "Assalamu Alaikum! Welcome back, it's wonderful to see you again. Let me know if there's anything I can help you with today. ✨"
-                    : "Assalamu Alaikum! I am Fuad, your AI guide for this creative zone. It is a pleasure to have you here. Please feel free to explore my work or ask any questions you may have. 🙏";
+                const welcomeMessages = hasVisited ? WELCOME_MESSAGES_RETURN : WELCOME_MESSAGES_FIRST_TIME;
+                const welcomeMessage = getRandomResponse(welcomeMessages, lastWelcomeRef);
                 localStorage.setItem('fuadAssistantVisited', 'true');
                 proactiveSpeakAndDisplay(welcomeMessage);
                 welcomeMessageSentRef.current = true;
@@ -363,7 +434,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     const [currentVisibleSection, setCurrentVisibleSection] = useState<string | null>(null);
     // Fix: Use explicit browser timer ID type for robustness.
-    const explanationTimerRef = useRef<number | null>(null);
+    const explanationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const explainedSections = useRef<Set<string>>(new Set());
 
     useEffect(() => {
@@ -387,22 +458,29 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [sectionRefs]);
 
     useEffect(() => {
-        if (explanationTimerRef.current) window.clearTimeout(explanationTimerRef.current);
+        if (explanationTimerRef.current) clearTimeout(explanationTimerRef.current);
 
         if (!currentVisibleSection || explainedSections.current.has(currentVisibleSection) || !hasAppeared || !isReady) return;
 
         const isSpeaking = botStatusRef.current === 'speaking' || botStatusRef.current === 'thinking';
         if (isSpeaking) {
             stopCurrentSpeech();
-            proactiveSpeakAndDisplay("Umm, okay...");
+            proactiveSpeakAndDisplay(getRandomResponse(INTERRUPTION_RESPONSES, lastInterruptionRef));
         }
 
-        explanationTimerRef.current = window.setTimeout(() => {
+        explanationTimerRef.current = setTimeout(() => {
             let text = '';
-            switch (currentVisibleSection) {
-                case 'portfolio': text = "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨"; break;
-                case 'contact': text = "Should you wish to collaborate or create something amazing together, this is the place. You can find all my social media links here. I look forward to hearing from you, Insha'Allah. 🤝"; break;
-                case 'about': text = "Here is a little bit about me. I am Fuad Ahmed, from Sylhet, Bangladesh. I began my journey in this field in 2020, and Alhamdulillah, I am passionate about every project I undertake. 😊"; break;
+            const sectionKey = currentVisibleSection as keyof typeof SECTION_EXPLANATIONS;
+            if (SECTION_EXPLANATIONS[sectionKey]) {
+                const responses = SECTION_EXPLANATIONS[sectionKey];
+                let availableResponses = responses;
+                const lastUsed = lastSectionExplanationRef.current[sectionKey];
+                if (lastUsed && responses.length > 1) {
+                    availableResponses = responses.filter(r => r !== lastUsed);
+                }
+                const randomIndex = Math.floor(Math.random() * availableResponses.length);
+                text = availableResponses[randomIndex];
+                lastSectionExplanationRef.current[sectionKey] = text;
             }
             if (text) {
                 proactiveSpeakAndDisplay(text);
@@ -411,7 +489,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
         }, 1000);
 
         return () => {
-            if (explanationTimerRef.current) window.clearTimeout(explanationTimerRef.current);
+            if (explanationTimerRef.current) clearTimeout(explanationTimerRef.current);
         };
     }, [currentVisibleSection, hasAppeared, isReady, stopCurrentSpeech, proactiveSpeakAndDisplay]);
     
@@ -419,12 +497,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     useEffect(() => {
         if (onExcessiveMovement > lastMovementTrigger.current) {
             lastMovementTrigger.current = onExcessiveMovement;
-            const funnyResponses = [
-                "Whoa, slow down there, speed racer! You're making the stars dizzy!", 
-                "Bro, you trying to create a black hole with all that movement?", 
-                "Aray wah! Someone's full of energy today! Chill, yaar!"
-            ];
-            proactiveSpeakAndDisplay(funnyResponses[Math.floor(Math.random() * funnyResponses.length)]);
+            const funnyResponse = getRandomResponse(EXCESSIVE_MOVEMENT_RESPONSES, lastMovementRef);
+            proactiveSpeakAndDisplay(funnyResponse);
         }
     }, [onExcessiveMovement, proactiveSpeakAndDisplay]);
 
@@ -492,10 +566,10 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     useEffect(() => {
         const resetTimers = () => {
-            if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
-            if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
-            inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000); // 30 seconds for story
-            closeChatTimerRef.current = window.setTimeout(() => {
+            if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
+            if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
+            inactivityMessageTimerRef.current = setTimeout(handleInactivity, 30000); // 30 seconds for story
+            closeChatTimerRef.current = setTimeout(() => {
                 if (document.visibilityState === 'visible') setIsChatOpen(false);
             }, 90000);
         };
@@ -504,8 +578,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             resetTimers();
             events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true }));
             return () => {
-                if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
-                if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
+                if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
+                if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
                 events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true }));
             };
         }
