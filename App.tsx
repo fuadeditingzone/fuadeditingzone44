@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
 import { GRAPHIC_WORKS } from './constants';
@@ -41,6 +43,7 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
 export default function App() {
   const [isContentLoaded, setIsContentLoaded] = useState(false);
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const sections = { home: useRef<HTMLDivElement>(null), portfolio: useRef<HTMLDivElement>(null), contact: useRef<HTMLDivElement>(null), about: useRef<HTMLDivElement>(null) };
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -217,7 +220,12 @@ export default function App() {
   }, [modalState, isVfxVideoPlaying]);
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
-    if (!audioContextStarted.current) startBackgroundAudio(); else safePlay(audioRefs.current.click?.play());
+    if (!audioContextStarted.current) {
+        startBackgroundAudio();
+        setAudioUnlocked(true);
+    } else {
+        safePlay(audioRefs.current.click?.play());
+    }
     const target = e.target as HTMLElement;
     const isInteractive = target.closest('a, button');
     const isTextElement = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'].includes(target.tagName) || (target.tagName === 'SPAN' && target.childElementCount === 0);
@@ -281,6 +289,7 @@ export default function App() {
         />
         <main>
           <div ref={sections.home}><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
+          {/* Fix: Pass setActivePortfolioTab to the setActiveTab prop of the Portfolio component. */}
           <div ref={sections.portfolio}><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
           <div ref={sections.contact}><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
         </main>
@@ -293,7 +302,7 @@ export default function App() {
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
       </div>
-      <FuadAssistant sectionRefs={sections} />
+      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} />
     </div>
   );
 }

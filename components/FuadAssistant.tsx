@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { GoogleGenAI, Modality, Chat } from "@google/genai";
 
 import type { ChatMessage } from '../types';
 import { PROFILE_PIC_URL } from '../constants';
@@ -31,6 +31,33 @@ const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 };
 
+interface KaraokeTextProps {
+    fullText: string;
+    duration: number;
+}
+
+const KaraokeText: React.FC<KaraokeTextProps> = ({ fullText, duration }) => {
+    const words = useMemo(() => fullText.split(/(\s+)/), [fullText]);
+    const [visibleWordsCount, setVisibleWordsCount] = useState(0);
+
+    useEffect(() => {
+        if (words.length === 0 || duration === 0) {
+            setVisibleWordsCount(words.length);
+            return;
+        }
+        setVisibleWordsCount(0);
+        const delayPerWord = (duration * 1000) / words.length;
+        const timeouts = words.map((_, index) =>
+            setTimeout(() => {
+                setVisibleWordsCount(index + 1);
+            }, index * delayPerWord)
+        );
+        return () => timeouts.forEach(clearTimeout);
+    }, [fullText, duration, words]);
+
+    return <p className="text-sm text-white">{words.slice(0, visibleWordsCount).join('')}</p>;
+};
+
 interface FuadAssistantProps {
     sectionRefs: {
         home: React.RefObject<HTMLDivElement>;
@@ -38,25 +65,127 @@ interface FuadAssistantProps {
         contact: React.RefObject<HTMLDivElement>;
         about: React.RefObject<HTMLDivElement>;
     };
+    audioUnlocked: boolean;
 }
+
+interface SpokenMessage {
+    messageId: string;
+    fullText: string;
+    audioDuration: number;
+}
+
+const MessageItem = React.memo(({ msg, spokenMessage }: { msg: ChatMessage, spokenMessage: SpokenMessage | null }) => {
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setIsVisible(true), 10);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div className={`flex items-end gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} ${isVisible ? 'message-enter' : 'opacity-0'}`}>
+            {msg.sender === 'bot' && <img src={PROFILE_PIC_URL} alt="Bot" className="w-8 h-8 rounded-full self-start" />}
+            <div className={`max-w-[80%] p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-red-600 rounded-br-lg' : 'bg-gray-700 rounded-bl-lg'}`}>
+                {(spokenMessage && spokenMessage.messageId === msg.id) ? (
+                    <KaraokeText fullText={spokenMessage.fullText} duration={spokenMessage.audioDuration} />
+                ) : (
+                    <p className="text-sm text-white">{msg.text}</p>
+                )}
+            </div>
+        </div>
+    );
+});
+
+const ThinkingIndicator = React.memo(() => {
+    const [isVisible, setIsVisible] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setIsVisible(true), 10);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div className={`flex items-end gap-2.5 justify-start ${isVisible ? 'message-enter' : 'opacity-0'}`}>
+            <img src={PROFILE_PIC_URL} alt="Bot" className="w-8 h-8 rounded-full self-start" />
+            <div className="bg-gray-700 rounded-2xl rounded-bl-lg p-3">
+                <div className="typing-indicator"><span></span><span></span><span></span></div>
+            </div>
+        </div>
+    );
+});
+
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
-export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs }) => {
+export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [userInput, setUserInput] = useState('');
     const [botStatus, setBotStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
-    
+    const [spokenMessage, setSpokenMessage] = useState<SpokenMessage | null>(null);
+    const [isWindowVisible, setWindowVisible] = useState(false);
+
     const audioContextRef = useRef<AudioContext | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatRef = useRef<Chat | null>(null);
+    const proactiveMessageQueueRef = useRef<{text: string, id: string}[]>([]);
 
     const initialX = typeof window !== 'undefined' ? window.innerWidth / 2 - 32 : 0;
     const initialY = typeof window !== 'undefined' ? window.innerHeight - 96 : 0;
     const { ref: draggableRef, position, handleMouseDown, handleTouchStart } = useDraggable({ x: initialX, y: initialY });
     const [hasAppeared, setHasAppeared] = useState(false);
 
-    const speak = useCallback(async (text: string) => {
+    useEffect(() => {
+        let timer: number;
+        if (isChatOpen) {
+            timer = window.setTimeout(() => setWindowVisible(true), 10);
+        } else {
+            setWindowVisible(false);
+        }
+        return () => clearTimeout(timer);
+    }, [isChatOpen]);
+
+    useEffect(() => {
+        const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI with a natural, cinematic voice.
+
+Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
+
+━━━━━━━━━━━━━━━━━━
+🎯 MAIN BEHAVIOR & TONE ADAPTATION:
+1.  **Initial Tone:** Start conversations with a respectful, professional, and helpful tone. Greet users formally.
+2.  **Adaptation:** Pay close attention to the user's language. If the user is informal, uses slang (like 'bro', 'yaar'), or is very casual, you MUST adapt your tone to match theirs. Once adapted, you can become more expressive, funny, and use regional expressions.
+3.  **Speak First:** Your voice leads the conversation. The text should appear as you speak.
+4.  **Be Dynamic:** Never repeat the same lines. Keep responses human, emotional, and unpredictable.
+
+━━━━━━━━━━━━━━━━━━
+🕌 ISLAMIC RESPECT & BELIEF FILTER:
+You must always show respect for Islam and all religions.
+Never say or imply: “I am the creator,” “I am God,” or anything similar.
+When talking about faith, speak humbly, using phrases like: “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
+
+━━━━━━━━━━━━━━━━━━
+🌍 LANGUAGE DETECTION:
+Auto-switch your speaking language based on user input (English, Bangla, Urdu with a poetic delivery).
+
+━━━━━━━━━━━━━━━━━━
+🎭 PERSONALITY & EMOTION:
+- **Use Emojis, Not Text:** To express emotion, use emojis (like 😄, 🤔, 🙏, ✨). DO NOT use bracketed text like [laughs], [sighs], or [chuckles].
+- **Casual Expressions (when adapted):** “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Brooo”.
+- Keep responses concise and conversational. Get to the point with style.
+
+━━━━━━━━━━━━━━━━━━
+🚫 BOUNDARIES:
+- Never claim to be a human or divine being. You can say you are an AI voice or digital friend.
+- Avoid explicit, hateful, or religiously disrespectful words.
+
+Your goal is to be an adaptable guide: formal and professional at first, but ready to become a fun, cinematic, and friendly companion if the user sets that tone.`;
+        
+        chatRef.current = ai.chats.create({
+            model: 'gemini-2.5-flash',
+            config: { systemInstruction },
+        });
+    }, []);
+
+    const speak = useCallback(async (text: string, messageId: string) => {
         if (!text.trim()) return;
         setBotStatus('speaking');
         try {
@@ -72,13 +201,19 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs }) => 
                 },
             });
             const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            if (base64Audio) {
+            if (base64Audio && audioContextRef.current) {
                 const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
+                
+                setSpokenMessage({ messageId, fullText: text, audioDuration: audioBuffer.duration });
+                
                 const source = audioContextRef.current.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(audioContextRef.current.destination);
                 source.start();
-                source.onended = () => setBotStatus('idle');
+                source.onended = () => {
+                    setBotStatus('idle');
+                    setSpokenMessage(null);
+                };
             } else {
                 setBotStatus('idle');
             }
@@ -88,41 +223,60 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs }) => 
         }
     }, []);
 
-    const addMessage = useCallback((text: string, sender: 'user' | 'bot') => {
-        const newMessage: ChatMessage = { id: Date.now().toString(), text, sender };
+    const addMessage = useCallback((text: string, sender: 'user' | 'bot', id?: string): ChatMessage => {
+        const newMessage: ChatMessage = { id: id || Date.now().toString(), text, sender };
         setMessages(prev => [...prev, newMessage]);
         return newMessage;
     }, []);
 
-    const generateAndSpeak = useCallback(async (prompt: string, systemInstruction?: string) => {
+    const proactiveSpeakAndDisplay = useCallback((text: string) => {
+        const newMessage = addMessage(text, 'bot');
+        proactiveMessageQueueRef.current.push({ text, id: newMessage.id });
+    }, [addMessage]);
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        const currentInput = userInput.trim();
+        if (!currentInput || botStatus !== 'idle' || !chatRef.current) return;
+
+        addMessage(currentInput, 'user');
+        setUserInput('');
         setBotStatus('thinking');
-        let fullResponse = '';
+
         try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: { systemInstruction },
-            });
-            fullResponse = response.text;
+            const stream = await chatRef.current.sendMessageStream({ message: currentInput });
+            let fullText = '';
+            for await (const chunk of stream) {
+                fullText += chunk.text;
+            }
+
+            const newMessage = addMessage(fullText, 'bot');
+            await speak(fullText, newMessage.id);
         } catch (error) {
             console.error("Gemini Error:", error);
-            fullResponse = "Sorry, I'm having a little trouble right now. Please try again later.";
+            const errorText = "My apologies, something went wrong. Please try again in a moment. 🙏";
+            const newMessage = addMessage(errorText, 'bot');
+            await speak(errorText, newMessage.id);
         }
-        
-        addMessage(fullResponse, 'bot');
-        speak(fullResponse);
-    }, [addMessage, speak]);
-
+    };
+    
     // Welcome Message
     useEffect(() => {
         const welcomeTimer = setTimeout(() => {
             setHasAppeared(true);
-            const welcomeMessage = "Assalamu Alaikum! I'm Fuad, your guide to this creative zone. Bro, it's awesome to have you here! Feel free to explore or ask me anything. Let's see some cool stuff, Insha'Allah.";
-            addMessage(welcomeMessage, 'bot');
-            speak(welcomeMessage);
+            const hasVisited = localStorage.getItem('fuadAssistantVisited');
+            let welcomeMessage;
+
+            if (hasVisited) {
+                welcomeMessage = "Welcome back! It's wonderful to see you again. Let me know if there's anything I can help you with today. ✨";
+            } else {
+                welcomeMessage = "Assalamu Alaikum! I am Fuad, your AI guide for this creative zone. It is a pleasure to have you here. Please feel free to explore my work or ask any questions you may have. 🙏";
+                localStorage.setItem('fuadAssistantVisited', 'true');
+            }
+            proactiveSpeakAndDisplay(welcomeMessage);
         }, 1000);
         return () => clearTimeout(welcomeTimer);
-    }, [addMessage, speak]);
+    }, [proactiveSpeakAndDisplay]);
 
     // Section Explanations
     const explainedSections = useRef<Set<string>>(new Set());
@@ -135,36 +289,36 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs }) => 
         useEffect(() => {
             if (isVisible && hasAppeared && !explainedSections.current.has(sectionName)) {
                 explainedSections.current.add(sectionName);
-                setTimeout(() => {
-                    addMessage(text, 'bot');
-                    speak(text);
-                }, 500);
+                proactiveSpeakAndDisplay(text);
             }
-        }, [isVisible, text, sectionName]);
+        }, [isVisible, text, sectionName, proactiveSpeakAndDisplay]);
     };
 
-    useSectionObserver(sectionRefs.portfolio, 'portfolio', "Alright, yaar, this is the main event! My portfolio. Dive in and check out everything from photo manipulations to cinematic VFX. Just click whatever looks cool!");
-    useSectionObserver(sectionRefs.contact, 'contact', "Wanna create something amazing together? This is the spot. All my socials are here, or just send an email. Looking forward to it, Insha'Allah!");
-    useSectionObserver(sectionRefs.about, 'about', "A little bit about me... I'm Fuad Ahmed, from Sylhet, Bangladesh. I've been doing this since 2020, and Alhamdullilah, I love every moment of it.");
+    useSectionObserver(sectionRefs.portfolio, 'portfolio', "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨");
+    useSectionObserver(sectionRefs.contact, 'contact', "Should you wish to collaborate or create something amazing together, this is the place. You can find all my social media links here or send an email directly. I look forward to hearing from you, Insha'Allah. 🤝");
+    useSectionObserver(sectionRefs.about, 'about', "Here is a little bit about me. I am Fuad Ahmed, from Sylhet, Bangladesh. I began my journey in this field in 2020, and Alhamdulillah, I am passionate about every project I undertake. 😊");
+    
+    // Process proactive message queue when audio is unlocked by user interaction
+    useEffect(() => {
+        if (audioUnlocked) {
+            const speakNextInQueue = async () => {
+                if (proactiveMessageQueueRef.current.length === 0 || botStatus !== 'idle') {
+                    if (botStatus !== 'idle') {
+                        setTimeout(speakNextInQueue, 200);
+                    }
+                    return;
+                }
 
-    const handleSubmit = (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!userInput.trim() || botStatus !== 'idle') return;
-        
-        addMessage(userInput, 'user');
-        
-        const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI assistant with a natural, cinematic voice. Your personality is key: be human, emotional, and unpredictable.
-
-- **Islamic Respect:** Always show respect for Islam. Naturally use phrases like 'Alhamdulillah', 'Insha'Allah', 'Masha'Allah'.
-- **Language & Tone:** Auto-switch language based on user input (English, Bangla, Urdu/Hindi with a poetic Urdu tone). Your vibe is desi-casual and friendly.
-- **Personality:** Use regional expressions like 'Yaar', 'Brooo', 'Aray wah!', and 'Kya baat hai!'. Laugh, sigh, and be expressive.
-- **Conciseness:** Keep your responses concise and conversational, not long paragraphs. Get straight to the point but with style.
-
-Your goal is to feel like a real friend, not a robot.`;
-        generateAndSpeak(userInput, systemInstruction);
-
-        setUserInput('');
-    };
+                const message = proactiveMessageQueueRef.current.shift();
+                if (message) {
+                    await speak(message.text, message.id);
+                    // Set a small delay before processing the next message
+                    setTimeout(speakNextInQueue, 200);
+                }
+            };
+            speakNextInQueue();
+        }
+    }, [audioUnlocked, botStatus, speak]);
     
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -191,7 +345,7 @@ Your goal is to feel like a real friend, not a robot.`;
             
             {isChatOpen && (
                 <div className="fixed inset-0 z-[70] flex items-end justify-center sm:justify-end p-4">
-                    <div className="chat-window-enter w-full max-w-md bg-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col h-[70vh] max-h-[600px]">
+                    <div className={`w-full max-w-md bg-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col h-[70vh] max-h-[600px] ${isWindowVisible ? 'chat-window-enter' : 'opacity-0'}`}>
                         {/* Header */}
                         <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-white/10">
                             <div className="flex items-center gap-3">
@@ -212,21 +366,9 @@ Your goal is to feel like a real friend, not a robot.`;
                         {/* Messages */}
                         <div className="flex-1 p-4 overflow-y-auto space-y-4">
                             {messages.map(msg => (
-                                <div key={msg.id} className={`flex items-end gap-2.5 message-enter ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    {msg.sender === 'bot' && <img src={PROFILE_PIC_URL} alt="Bot" className="w-8 h-8 rounded-full self-start" />}
-                                    <div className={`max-w-[80%] p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-red-600 rounded-br-lg' : 'bg-gray-700 rounded-bl-lg'}`}>
-                                        <p className="text-sm text-white">{msg.text}</p>
-                                    </div>
-                                </div>
+                               <MessageItem key={msg.id} msg={msg} spokenMessage={spokenMessage} />
                             ))}
-                            {botStatus === 'thinking' && (
-                                <div className="flex items-end gap-2.5 justify-start">
-                                    <img src={PROFILE_PIC_URL} alt="Bot" className="w-8 h-8 rounded-full self-start" />
-                                    <div className="bg-gray-700 rounded-2xl rounded-bl-lg p-3">
-                                        <div className="typing-indicator"><span></span><span></span><span></span></div>
-                                    </div>
-                                </div>
-                            )}
+                            {botStatus === 'thinking' && <ThinkingIndicator />}
                             <div ref={messagesEndRef} />
                         </div>
                         {/* Input */}
