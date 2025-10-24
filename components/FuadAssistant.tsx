@@ -201,7 +201,15 @@ const ThinkingIndicator = React.memo(() => {
 
 export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked, isProfileCardOpen, onExcessiveMovement }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>(() => {
+        try {
+            const saved = localStorage.getItem('fuadAssistantChatHistory');
+            return saved ? JSON.parse(saved) : [];
+        } catch (error) {
+            console.error("Failed to load chat history:", error);
+            return [];
+        }
+    });
     const [userInput, setUserInput] = useState('');
     const [botStatus, setBotStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
     const [spokenMessage, setSpokenMessage] = useState<SpokenMessage | null>(null);
@@ -213,7 +221,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatWindowRef = useRef<HTMLDivElement | null>(null);
-    // Fix: Use ReturnType<typeof window.setTimeout> for timer IDs to ensure correct browser types and resolve type conflicts.
+    // FIX: Use ReturnType<typeof window.setTimeout> to correctly type timer IDs for browser environments, resolving type inference errors.
     const inactivityMessageTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const closeChatTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     
@@ -299,6 +307,10 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             chatRef.current = genAI.chats.create({
                 model: 'gemini-2.5-flash',
                 config: { systemInstruction },
+                history: messages.map(m => ({
+                    role: m.sender === 'user' ? 'user' : 'model',
+                    parts: [{ text: m.text }],
+                })),
             });
             setIsReady(true);
             console.log(`AI Initialized with API Key index: ${keyIndex}`);
@@ -308,7 +320,15 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             setIsReady(false);
             return false;
         }
-    }, []);
+    }, [messages]);
+    
+    useEffect(() => {
+        try {
+            localStorage.setItem('fuadAssistantChatHistory', JSON.stringify(messages));
+        } catch (error) {
+            console.error("Failed to save chat history:", error);
+        }
+    }, [messages]);
 
     useEffect(() => {
         const audio = new Audio('https://www.dropbox.com/scl/fi/f0hf1mcqk7cze184jx18o/typingphone-101683.mp3?rlkey=3x7soomaejec1vjfq980ixf31&dl=1');
@@ -446,19 +466,26 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     };
     
     useEffect(() => {
-        if (isReady && audioUnlocked && !welcomeMessageSentRef.current) {
-            // Fix: Use window.setTimeout for consistency.
-             window.setTimeout(() => {
+        if (!hasAppeared) {
+            if (messages.length > 0) {
+                // If history exists, just show the assistant button.
                 setHasAppeared(true);
-                const hasVisited = localStorage.getItem('fuadAssistantVisited');
-                const welcomeMessages = hasVisited ? WELCOME_MESSAGES_RETURN : WELCOME_MESSAGES_FIRST_TIME;
-                const welcomeMessage = getRandomResponse(welcomeMessages, lastWelcomeRef);
-                localStorage.setItem('fuadAssistantVisited', 'true');
-                proactiveSpeakAndDisplay(welcomeMessage);
-                welcomeMessageSentRef.current = true;
-            }, 500);
+                welcomeMessageSentRef.current = true; // Prevent welcome message.
+            } else if (isReady && audioUnlocked && !welcomeMessageSentRef.current) {
+                // If no history, and ready to go, send welcome message.
+                // Fix: Use window.setTimeout for consistency.
+                 window.setTimeout(() => {
+                    setHasAppeared(true);
+                    const hasVisited = localStorage.getItem('fuadAssistantVisited');
+                    const welcomeMessages = hasVisited ? WELCOME_MESSAGES_RETURN : WELCOME_MESSAGES_FIRST_TIME;
+                    const welcomeMessage = getRandomResponse(welcomeMessages, lastWelcomeRef);
+                    localStorage.setItem('fuadAssistantVisited', 'true');
+                    proactiveSpeakAndDisplay(welcomeMessage);
+                    welcomeMessageSentRef.current = true;
+                }, 500);
+            }
         }
-    }, [isReady, audioUnlocked, proactiveSpeakAndDisplay]);
+    }, [isReady, audioUnlocked, proactiveSpeakAndDisplay, messages.length, hasAppeared]);
 
     const [currentVisibleSection, setCurrentVisibleSection] = useState<string | null>(null);
     // Fix: Use ReturnType<typeof window.setTimeout> for timer IDs to ensure correct browser types and resolve type conflicts.
@@ -597,7 +624,6 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     useEffect(() => {
         const resetTimers = () => {
-            // FIX: Ensure all timer functions are prefixed with `window.` to resolve type conflicts between Node.js and browser environments. This fixes the 'unknown' type error on timer refs.
             // Fix: Use window.clearTimeout and ensure timer ID ref has the correct type.
             if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
             // Fix: Use window.clearTimeout and ensure timer ID ref has the correct type.

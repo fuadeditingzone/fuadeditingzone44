@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
 import { GRAPHIC_WORKS } from './constants';
@@ -311,7 +312,7 @@ export default function App() {
   }, [contextMenu]);
 
   return (
-    <div className="text-white" onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+    <div className="text-white relative isolate" onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
       <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
       <CustomCursor isVisible={true} />
       <GalaxyBackground onLightningFlash={triggerLightningReflection} />
