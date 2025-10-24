@@ -128,7 +128,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     // AI Initialization
     const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
-    const [isReady, setIsReady] = useState(false); // New state to track initialization
+    const [isReady, setIsReady] = useState(false);
     
     const proactiveMessageQueueRef = useRef<{text: string, id: string}[]>([]);
 
@@ -151,7 +151,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
         try {
             const apiKey = process.env.API_KEY;
             if (!apiKey) {
-                throw new Error("API_KEY environment variable not set.");
+                console.error("Fuad Assistant could not be initialized: API Key is missing.");
+                setIsReady(false);
+                return;
             }
             const genAI = new GoogleGenAI({ apiKey });
             aiRef.current = genAI;
@@ -196,7 +198,8 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             });
             setIsReady(true);
         } catch (error) {
-            console.error("Failed to initialize Fuad Assistant's AI. The API key might be missing or invalid.", error);
+            console.error("An unexpected error occurred while initializing Fuad Assistant's AI.", error);
+            setIsReady(false);
         }
     }, []);
 
