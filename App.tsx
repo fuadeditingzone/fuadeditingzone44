@@ -1,6 +1,6 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-// FIX: Removed 'LiveSession' from the import as it is not an exported member of '@google/genai'.
+
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Modality, Chat, GenerateContentResponse, LiveServerMessage } from "@google/genai";
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ChatMessage, ModalItem, Language, GenAIBlob } from './types';
 import { GRAPHIC_WORKS, CHAT_TOOLS, getAiSystemInstruction, INACTIVITY_STORIES, MUSIC_TRACKS } from './constants';
@@ -20,8 +20,6 @@ import { Chat as ChatComponent } from './components/Chat';
 import { FloatingChatButton } from './components/FloatingChatButton';
 import { MusicPlayer } from './components/MusicPlayer';
 
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 // --- Audio Helper Functions ---
 function decode(base64: string): Uint8Array {
@@ -113,7 +111,7 @@ const WELCOME_BACK_MESSAGES: Record<Language, string[]> = {
     en: [ "Assalamu Alaikum and welcome back! It's great to see you again. Feel free to explore more of my work or continue our last conversation.", "Assalamu Alaikum! Welcome back to my creative space. Glad to have you here again. Let me know if anything catches your eye!", "Assalamu Alaikum, and welcome back! I was hoping I'd see you again. Ready to dive back into the world of design and VFX?" ],
     bn: [ "আসসালামু আলাইকুম, আবার স্বাগতম! আপনাকে আবার দেখে ভালো লাগলো। আমার আরও কাজ দেখতে পারেন অথবা আমাদের আগের কথা চালিয়ে যেতে পারেন।", "আসসালামু আলাইকুম! আমার ক্রিয়েটিভ জগতে আপনাকে আবার স্বাগতম। আপনাকে আবার এখানে পেয়ে আমি আনন্দিত। কোনো কিছু ভালো লাগলে জানাবেন!", "আসসালামু আলাইকুম, আপনাকে আবার দেখে খুব খুশি হলাম! ডিজাইন এবং ভিএফএক্সের জগতে আবার ডুব দিতে প্রস্তুত তো?" ],
     hi: [ "अस्सलामु अलैकुम, और आपका फिर से स्वागत है! आपको दोबारा देखकर बहुत अच्छा लगा। आप मेरा और काम देख सकते हैं या हमारी पिछली बातचीत जारी रख सकते हैं।", "अस्सलामु अलैकुम! मेरी रचनात्मक दुनिया में आपका फिर से स्वागत है। आपको यहाँ दोबारा देखकर खुशी हुई। अगर कुछ पसंद आए तो बताइएगा!", "अस्सलामु अलैकुम, और वापस स्वागत है! मुझे उम्मीद थी कि आप फिर आएंगे। क्या आप डिजाइन और वीएफएक्स की दुनिया में फिर से गोता लगाने के लिए तैयार हैं?" ],
-    ur: [ "السلام علیکم، واپس خوش آمدید! آپ کو دوبارہ دیکھ کر بہت خوشی ہوئی۔ آپ मेरे مزید کام دیکھ सकते ہیں বা ہماری پچھلی گفتگو جاری رکھ सकते ہیں۔", "السلام علیکم! میری تخلیقی دنیا میں آپ کو ایک بار پھر خوش آمدید۔ آپ کو یہاں دوبارہ دیکھ کر خوشی ہوئی۔ اگر کوئی چیز آپ کی توجہ حاصل کرے تو مجھے بتائیں۔", "السلام علیکم، اور واپس خوش آمدید! مجھے امید تھی کہ میں آپ کو دوبارہ دیکھوں گا۔ کیا آپ ڈیزائن اور وی ایف ایکس کی دنیا میں دوبارہ غوطہ لگانے کے लिए तैयार ہیں؟" ]
+    ur: [ "السلام علیکم، واپس خوش آمدید! آپ کو دوبارہ دیکھ کر بہت خوشی ہوئی۔ آپ میرے مزید کام دیکھ सकते ہیں বা ہماری پچھلی گفتگو جاری رکھ सकते ہیں۔", "السلام علیکم! میری تخلیقی دنیا میں آپ کو ایک بار پھر خوش آمدید۔ آپ کو یہاں دوبارہ دیکھ کر خوشی ہوئی۔ اگر کوئی چیز آپ کی توجہ حاصل کرے تو مجھے بتائیں۔", "السلام علیکم، اور واپس خوش آمدید! مجھے امید تھی کہ میں آپ کو دوبارہ دیکھوں گا۔ کیا آپ ڈیزائن اور وی ایف ایکس کی دنیا میں دوبارہ غوطہ لگانے کے लिए तैयार ہیں؟" ]
 };
 
 const isSectionActive = (el: HTMLElement | null): boolean => {
@@ -131,14 +129,49 @@ type OldChatMessage = { sender: 'bot' | 'user'; text: string; id?: string; audio
 const safePlay = (mediaPromise: Promise<void> | undefined) => {
     if (mediaPromise !== undefined) {
         mediaPromise.catch(error => {
-            if ((error as DOMException).name !== 'AbortError') {
+            if ((error as Error).name !== 'AbortError' && (error as Error).name !== 'NotAllowedError') {
                 console.error("Media playback failed:", error);
             }
         });
     }
 };
 
+type LiveSession = {
+  close: () => void;
+  sendRealtimeInput: (input: { media: GenAIBlob; }) => void;
+  sendToolResponse: (response: any) => void;
+};
+
+async function generateContentWithRetry(ai: GoogleGenAI, params: Parameters<typeof ai.models.generateContent>[0], retries = 3, delay = 1000): Promise<GenerateContentResponse> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const result = await ai.models.generateContent(params);
+            return result;
+        } catch (error) {
+            console.warn(`Gemini API call attempt ${i + 1} of ${retries} failed:`, error);
+            const errorString = (error as Error).toString();
+            // For user quota or bad request errors, fail immediately without retrying.
+            if (errorString.includes('429') || errorString.includes('RESOURCE_EXHAUSTED') || errorString.includes('400')) {
+                console.error("Gemini API call failed with a non-retriable error:", error);
+                throw error;
+            }
+
+            if (i < retries - 1) {
+                const backoffDelay = delay * Math.pow(2, i) + Math.random() * 1000;
+                await new Promise(res => setTimeout(res, backoffDelay));
+            } else {
+                console.error("Gemini API call failed after all retries.", error);
+                throw error;
+            }
+        }
+    }
+    throw new Error("API call failed after multiple retries.");
+}
+
+const masterAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
 export default function App() {
+  const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.API_KEY as string }), []);
   const [isContentLoaded, setIsContentLoaded] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -187,7 +220,7 @@ export default function App() {
   const stormSoundFadeInterval = useRef<number | null>(null);
 
   // Live Session Refs
-  const liveSessionPromise = useRef<Promise<any> | null>(null);
+  const liveSessionPromise = useRef<Promise<LiveSession> | null>(null);
   const inputStream = useRef<MediaStream | null>(null);
   const inputAudioContext = useRef<AudioContext | null>(null);
   const outputAudioContext = useRef<AudioContext | null>(null);
@@ -218,43 +251,46 @@ export default function App() {
       });
   }, [stopCurrentAudio]);
 
-  const generateTtsAudio = useCallback(async (text: string, retries = 3, delay = 1000): Promise<HTMLAudioElement | null> => {
-    for (let i = 0; i < retries; i++) {
-        try {
-          const textForSpeech = cleanTextForTTS(text);
-          if (!textForSpeech) return null;
-          if (ttsCache.current[textForSpeech]) {
-            const cachedAudio = ttsCache.current[textForSpeech].cloneNode(true) as HTMLAudioElement;
-            cachedAudio.volume = 0.7;
-            return cachedAudio;
-          }
-          const response = await ai.models.generateContent({ model: "gemini-2.5-flash-preview-tts", contents: [{ parts: [{ text: textForSpeech }] }], config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } } } });
-          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-          if (base64Audio) {
-            const pcmData = decode(base64Audio);
-            const audioUrl = pcmToWav(pcmData);
-            const audio = new Audio(audioUrl);
-            audio.volume = 0.7;
-            ttsCache.current[textForSpeech] = audio.cloneNode(true) as HTMLAudioElement;
-            return audio;
-          }
-        } catch (error) {
-          console.error(`TTS Generation attempt ${i + 1} failed:`, error);
-          if (i < retries - 1) await new Promise(res => setTimeout(res, delay * Math.pow(2, i))); else return null;
-        }
+  const generateTtsAudio = useCallback(async (text: string): Promise<HTMLAudioElement | null> => {
+    try {
+      const textForSpeech = cleanTextForTTS(text);
+      if (!textForSpeech) return null;
+      if (ttsCache.current[textForSpeech]) {
+        const cachedAudio = ttsCache.current[textForSpeech].cloneNode(true) as HTMLAudioElement;
+        cachedAudio.volume = 0.7;
+        return cachedAudio;
+      }
+      const response = await generateContentWithRetry(ai, { model: "gemini-2.5-flash-preview-tts", contents: [{ parts: [{ text: textForSpeech }] }], config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } } } });
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Audio) {
+        const pcmData = decode(base64Audio);
+        const audioUrl = pcmToWav(pcmData);
+        const audio = new Audio(audioUrl);
+        audio.volume = 0.7;
+        ttsCache.current[textForSpeech] = audio.cloneNode(true) as HTMLAudioElement;
+        return audio;
+      }
+    } catch (error) {
+      console.error(`TTS Generation failed after retries:`, error);
     }
     return null;
-  }, []);
+  }, [ai]);
 
   const playExclusiveAudio = useCallback((audioToPlay: HTMLAudioElement, onEndCallback?: () => void) => {
     stopCurrentAudio();
-    if (musicAudioRef.current && !musicAudioRef.current.paused) musicAudioRef.current.pause();
+    const musicAudio = musicAudioRef.current;
+    if (musicAudio && !musicAudio.paused) {
+        musicAudio.pause();
+    }
     activeAudioRef.current = audioToPlay;
     audioToPlay.currentTime = 0;
     safePlay(audioToPlay.play());
     const onEnded = () => {
         safePlay(audioRefs.current.botMessageDisappear?.play());
-        if (musicAudioRef.current?.paused && musicPlayerState.isVisible) safePlay(musicAudioRef.current.play());
+        const currentMusicAudio = musicAudioRef.current;
+        if (currentMusicAudio && currentMusicAudio.paused && musicPlayerState.isVisible) {
+            safePlay(currentMusicAudio.play());
+        }
         activeAudioRef.current = null;
         onEndCallback?.();
     };
@@ -409,8 +445,8 @@ export default function App() {
     const systemInstruction = getAiSystemInstruction(currentLangName);
     const geminiHistory = currentHistory.filter(msg => msg.isFinal).map((msg) => ({ role: msg.sender === 'bot' ? 'model' : 'user', parts: [{ text: msg.text }] }));
     chatInstance.current = ai.chats.create({ model: 'gemini-2.5-flash', history: geminiHistory, config: { systemInstruction, tools: [{ functionDeclarations: CHAT_TOOLS }] } });
-  }, []);
-
+  }, [ai.chats]);
+  
   useEffect(() => {
     isReturningVisitorRef.current = localStorage.getItem('fuad_has_visited') === 'true';
     try {
@@ -441,7 +477,7 @@ export default function App() {
     const slowNetworkTimer = setTimeout(() => { speakAndAddMessage( ["Just a moment...", "Hmm, thinking...", "Ugh, this connection..."][Math.floor(Math.random() * 3)]); }, 4000);
     if (chatLanguage === 'auto' && chatHistory.filter(m => m.sender === 'user').length <= 1) {
         try {
-          const detectionResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: `Analyze the following text and identify its primary language. Respond with only ONE of the following language codes: 'en' for English, 'bn' for Bangla, 'hi' for Hindi, 'ur' for Urdu. If the language appears to be a mix of Hindi and Urdu using the Roman script, default to 'ur' (Urdu). Text: "${message}"` });
+          const detectionResponse = await generateContentWithRetry(ai, { model: 'gemini-2.5-flash', contents: `Analyze the following text and identify its primary language. Respond with only ONE of the following language codes: 'en' for English, 'bn' for Bangla, 'hi' for Hindi, 'ur' for Urdu. If the language appears to be a mix of Hindi and Urdu using the Roman script, default to 'ur' (Urdu). Text: "${message}"` });
           const detectedLang = detectionResponse.text.trim() as Language;
           if (['en', 'bn', 'hi', 'ur'].includes(detectedLang)) handleLanguageChange(detectedLang);
         } catch (e) { console.error("Language detection failed", e); }
@@ -485,9 +521,19 @@ export default function App() {
             setChatHistory(prev => prev.map(msg => msg.id === streamingBotMessageId.current ? { ...msg, text: cleanSpeechText(sentenceBufferForAudio), isFinal: true } : msg));
             streamingBotMessageId.current = null;
         }
-    } catch (error) { console.error("Gemini chat error:", error); triggerBotMessage("Sorry, I'm having a little trouble connecting. Please try again in a moment.");
-    } finally { clearTimeout(slowNetworkTimer); setIsBotTyping(false); }
-  }, [chatHistory, chatLanguage, triggerBotMessage, isOffline, handleLanguageChange, isVoiceMode, stopAllSpeaking, isChatOpen, generateTtsAudio, processAudioQueue, speakAndAddMessage, processAndStripAmbienceCommands]);
+    } catch (error) {
+        console.error("Gemini chat error:", error);
+        const errorString = (error as Error).toString();
+        if (errorString.includes('429') || errorString.includes('RESOURCE_EXHAUSTED')) {
+            triggerBotMessage("My circuits are a bit busy right now, and I've hit my creative limit for the moment! Please try again in a little while. I just need a short coffee break. ☕");
+        } else {
+            triggerBotMessage("Sorry, I'm having a little trouble connecting. Please try again in a moment.");
+        }
+    } finally {
+        clearTimeout(slowNetworkTimer);
+        setIsBotTyping(false);
+    }
+  }, [chatHistory, chatLanguage, triggerBotMessage, isOffline, handleLanguageChange, isVoiceMode, stopAllSpeaking, isChatOpen, generateTtsAudio, processAudioQueue, speakAndAddMessage, processAndStripAmbienceCommands, ai]);
   
   // --- Live Session Logic ---
   const stopLiveSession = useCallback(async () => {
@@ -631,7 +677,7 @@ export default function App() {
       speakAndAddMessage("I couldn't access your microphone. Please check your browser permissions and try again.");
       stopLiveSession();
     }
-  }, [isLiveSessionActive, stopAllSpeaking, chatLanguage, stopLiveSession, speakAndAddMessage]);
+  }, [isLiveSessionActive, stopAllSpeaking, chatLanguage, stopLiveSession, speakAndAddMessage, ai.live]);
 
   const handleToggleLiveSession = useCallback(() => {
     if (isLiveSessionActive) {
@@ -642,8 +688,6 @@ export default function App() {
   }, [isLiveSessionActive, startLiveSession, stopLiveSession]);
 
   const startBackgroundAudio = useCallback(() => {
-    if (audioContextStarted.current) return;
-    audioContextStarted.current = true;
     const backgroundAudio = audioRefs.current.background;
     const playPromise = backgroundAudio?.play();
     if (playPromise !== undefined) {
@@ -668,12 +712,11 @@ export default function App() {
                 }
             }
         }).catch(error => {
-            if ((error as DOMException).name !== 'AbortError') {
-                console.log("Audio autoplay prevented.", error);
-                audioContextStarted.current = false;
+            if ((error as Error).name !== 'AbortError' && (error as Error).name !== 'NotAllowedError') {
+                console.error("Background audio playback failed unexpectedly:", error);
             }
         });
-    } else { audioContextStarted.current = false; }
+    }
   }, [isContentLoaded, triggerBotMessage, speakAndAddMessage]);
 
   useEffect(() => { Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); return () => { if(muteIntervalRef.current) clearInterval(muteIntervalRef.current); } }, []);
@@ -684,10 +727,10 @@ export default function App() {
     try {
         const contextMessages = chatHistory.slice(-4).map(m => `${m.sender === 'user' ? 'User' : 'AI'}: ${m.text}`).join('\n');
         const prompt = `Based on this recent conversation:\n${contextMessages}\n\nThe user is now idle. As Fuad's creative AI partner, briefly and naturally do one of the following in 1-2 sentences: ask a relevant follow-up question, share a short, related story or creative idea, or gently muse on the topic. Your response should sound human and spontaneous, not scripted.`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        const response = await generateContentWithRetry(ai, { model: 'gemini-2.5-flash', contents: prompt });
         triggerBotMessage(response.text, { isBackground: true });
     } catch (error) { console.error("Failed to generate contextual idle prompt:", error); triggerBotMessage(INACTIVITY_STORIES[Math.floor(Math.random() * INACTIVITY_STORIES.length)], { isBackground: true }); }
-  }, [isChatOpen, isAudioPlaying, chatHistory, triggerBotMessage]);
+  }, [isChatOpen, isAudioPlaying, chatHistory, triggerBotMessage, ai]);
 
   const resetInChatIdleTimer = useCallback(() => { if (inChatIdleTimerRef.current) clearTimeout(inChatIdleTimerRef.current); if(!isChatOpen && !chatHistory.some(m => !m.isFinal)) { inChatIdleTimerRef.current = window.setTimeout(sendInChatIdlePrompt, 45000); } }, [isChatOpen, chatHistory, sendInChatIdlePrompt]);
   useEffect(() => { resetInChatIdleTimer(); return () => { if (inChatIdleTimerRef.current) clearTimeout(inChatIdleTimerRef.current); }; }, [chatHistory, resetInChatIdleTimer]);
@@ -778,7 +821,16 @@ export default function App() {
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
     handleChatUserActivity();
-    if (!audioContextStarted.current) startBackgroundAudio(); else safePlay(audioRefs.current.click?.play());
+    if (!audioContextStarted.current) {
+        if (masterAudioContext.state === 'suspended') {
+            masterAudioContext.resume();
+        }
+        audioContextStarted.current = true;
+        startBackgroundAudio();
+    } else {
+        safePlay(audioRefs.current.click?.play());
+    }
+
     const target = e.target as HTMLElement;
     const isInteractive = target.closest('a, button');
     const isTextElement = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'].includes(target.tagName) || (target.tagName === 'SPAN' && target.childElementCount === 0);
@@ -863,6 +915,7 @@ export default function App() {
         <Header onScrollTo={scrollToSection} onProfileClick={() => setIsProfileCardOpen(true)} isReflecting={isReflecting} />
         <main>
           <div ref={sections.home}><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
+          {/* FIX: Correctly pass the state setter function `setActivePortfolioTab` for the `setActiveTab` prop. */}
           <div ref={sections.portfolio}><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onStopBotAudio={stopAllSpeaking} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
           <div ref={sections.contact}><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
         </main>
