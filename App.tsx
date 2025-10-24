@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
 import { GRAPHIC_WORKS } from './constants';
@@ -43,6 +45,7 @@ export default function App() {
   const [isContentLoaded, setIsContentLoaded] = useState(false);
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [excessiveMovement, setExcessiveMovement] = useState(0);
 
   const sections = { home: useRef<HTMLDivElement>(null), portfolio: useRef<HTMLDivElement>(null), contact: useRef<HTMLDivElement>(null), about: useRef<HTMLDivElement>(null) };
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -58,6 +61,8 @@ export default function App() {
   const lastMousePosition = useRef({ x: 0, y: 0, time: Date.now() });
   const isStormSoundPlaying = useRef(false);
   const stormSoundFadeInterval = useRef<number | null>(null);
+  const movementIntensity = useRef(0);
+  const movementTimeout = useRef<number | null>(null);
 
   const scrollToSection = useCallback((section: keyof typeof sections) => {
     const sectionElement = sections[section].current;
@@ -101,18 +106,46 @@ export default function App() {
     document.addEventListener('mouseover', handleMouseOver);
     return () => document.removeEventListener('mouseover', handleMouseOver);
   }, []);
+  
+    const handleMovement = useCallback((clientX: number, clientY: number) => {
+        const now = Date.now();
+        const timeDelta = now - lastMousePosition.current.time;
+
+        if (timeDelta < 10) return; // Debounce frequent events
+
+        const distance = Math.sqrt(Math.pow(clientX - lastMousePosition.current.x, 2) + Math.pow(clientY - lastMousePosition.current.y, 2));
+        const speed = distance / timeDelta;
+
+        lastMousePosition.current = { x: clientX, y: clientY, time: now };
+
+        if (speed > 8) { // High speed threshold
+            movementIntensity.current += 1;
+        }
+
+        if (movementTimeout.current) clearTimeout(movementTimeout.current);
+        movementTimeout.current = window.setTimeout(() => {
+            movementIntensity.current = Math.max(0, movementIntensity.current - 2);
+        }, 500);
+
+        if (movementIntensity.current > 20) {
+            setExcessiveMovement(c => c + 1);
+            movementIntensity.current = 0; // Reset after triggering
+        }
+    }, []);
+
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+        handleMovement(e.clientX, e.clientY);
+        
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
-        
         if (!audioContextStarted.current || !ctx) return;
         
         const now = Date.now();
         const timeDelta = now - lastMousePosition.current.time;
 
-        if (timeDelta > 20) { // Check more frequently for smoother lines
+        if (timeDelta > 20) {
             const distance = Math.sqrt(Math.pow(e.clientX - lastMousePosition.current.x, 2) + Math.pow(e.clientY - lastMousePosition.current.y, 2));
             const speed = distance / timeDelta;
             
@@ -120,15 +153,13 @@ export default function App() {
                 ctx.beginPath();
                 ctx.moveTo(lastMousePosition.current.x, lastMousePosition.current.y);
                 ctx.lineTo(e.clientX, e.clientY);
-                
                 ctx.strokeStyle = 'white';
                 ctx.lineWidth = Math.min(8, 2 + speed / 3); 
                 ctx.lineCap = 'round';
                 ctx.shadowColor = '#e50914';
                 ctx.shadowBlur = 25;
-                
                 ctx.stroke();
-                ctx.shadowBlur = 0; // Reset shadow for performance
+                ctx.shadowBlur = 0;
             }
 
             if (speed > 3 && !isStormSoundPlaying.current) {
@@ -147,7 +178,6 @@ export default function App() {
                     }, 5000);
                 }
             }
-            lastMousePosition.current = { x: e.clientX, y: e.clientY, time: now };
         }
         if (canPlayMoveSound.current) {
             safePlay(audioRefs.current.mouseMove?.play());
@@ -155,9 +185,20 @@ export default function App() {
             setTimeout(() => { canPlayMoveSound.current = true; }, 150);
         }
     };
+    
+    const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches.length > 0) {
+            handleMovement(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    };
+    
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+    window.addEventListener('touchmove', handleTouchMove);
+    return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [handleMovement]);
   
   // Effect for canvas setup and animation loop
   useEffect(() => {
@@ -180,7 +221,7 @@ export default function App() {
 
     let animationFrameId: number;
     const animate = () => {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
         animationFrameId = requestAnimationFrame(animate);
     };
@@ -287,12 +328,11 @@ export default function App() {
             isReflecting={isReflecting} 
         />
         <main>
-          <div ref={sections.home}><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
-          {/* Fix: Pass setActivePortfolioTab to the setActiveTab prop of the Portfolio component. */}
-          <div ref={sections.portfolio}><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
-          <div ref={sections.contact}><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
+          <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
+          <div ref={sections.portfolio} id="portfolio"><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
+          <div ref={sections.contact} id="contact"><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
         </main>
-        <div ref={sections.about}><AboutAndFooter isReflecting={isReflecting} /></div>
+        <div ref={sections.about} id="about"><AboutAndFooter isReflecting={isReflecting} /></div>
         {modalState && <ModalViewer state={modalState} onClose={closeModal} onNext={showNext} onPrev={showPrev} />}
         {isGalleryGridOpen && <GalleryGridModal items={GRAPHIC_WORKS} onClose={() => setIsGalleryGridOpen(false)} onImageClick={openSingleImageViewer} />}
         {singleImageViewerState && <ModalViewer state={singleImageViewerState} onClose={() => setSingleImageViewerState(null)} onNext={showNextInSingleImageViewer} onPrev={showPrevInSingleImageViewer} />}
@@ -301,7 +341,7 @@ export default function App() {
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
       </div>
-      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileCardOpen} />
+      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileCardOpen} onExcessiveMovement={excessiveMovement} />
     </div>
   );
 }

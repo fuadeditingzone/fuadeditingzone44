@@ -40,7 +40,6 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden"
             style={{ perspective: '600px', transition: 'transform 0.5s ease-out' }}
         >
-            <div className="absolute inset-0 bg-black" />
             <div className="galaxy-nebula" />
             <div className="hyperspace-container slow-down">
                  <div className="stars-plane stars-plane-1" />
