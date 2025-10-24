@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // Fix: Use static imports for @google/genai to provide strong types and fix inference issues.
-import { GoogleGenAI, Modality, Chat } from "@google/genai";
+import { GoogleGenAI, Modality, Chat, ApiError } from "@google/genai";
 
 import type { ChatMessage } from '../types';
 import { PROFILE_PIC_URL } from '../constants';
@@ -40,8 +40,6 @@ const API_KEYS = [
   'AIzaSyBG6SPKEuHwWE0OrqYIvpWMELj-QNCERGI',
   'AIzaSyBJMQn2WGt8OtR546dC1IyrwN7tsIm8jAM'
 ].filter((key): key is string => !!key);
-
-const ACTIVE_API_KEY = API_KEYS[0];
 
 // --- Response Banks for Variety ---
 const WELCOME_MESSAGES_FIRST_TIME = [
@@ -127,11 +125,13 @@ const KaraokeText: React.FC<KaraokeTextProps> = ({ fullText, duration }) => {
         setVisibleWordsCount(0);
         const delayPerWord = (duration * 1000) / words.length;
         const timeouts = words.map((_, index) =>
-            setTimeout(() => {
+            // Fix: Use window.setTimeout for consistency and to avoid type conflicts.
+            window.setTimeout(() => {
                 setVisibleWordsCount(index + 1);
             }, index * delayPerWord)
         );
-        return () => timeouts.forEach(clearTimeout);
+        // Fix: Use window.clearTimeout for consistency.
+        return () => timeouts.forEach(window.clearTimeout);
     }, [fullText, duration, words]);
 
     return <p className="text-sm text-white">{words.slice(0, visibleWordsCount).join('')}</p>;
@@ -159,8 +159,10 @@ const MessageItem = React.memo(({ msg, spokenMessage }: { msg: ChatMessage, spok
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
-        const timer = setTimeout(() => setIsVisible(true), 10);
-        return () => clearTimeout(timer);
+        // Fix: Use window.setTimeout for consistency.
+        const timer = window.setTimeout(() => setIsVisible(true), 10);
+        // Fix: Use window.clearTimeout for consistency.
+        return () => window.clearTimeout(timer);
     }, []);
 
     return (
@@ -180,8 +182,10 @@ const MessageItem = React.memo(({ msg, spokenMessage }: { msg: ChatMessage, spok
 const ThinkingIndicator = React.memo(() => {
     const [isVisible, setIsVisible] = useState(false);
     useEffect(() => {
-        const timer = setTimeout(() => setIsVisible(true), 10);
-        return () => clearTimeout(timer);
+        // Fix: Use window.setTimeout for consistency.
+        const timer = window.setTimeout(() => setIsVisible(true), 10);
+        // Fix: Use window.clearTimeout for consistency.
+        return () => window.clearTimeout(timer);
     }, []);
 
     return (
@@ -209,16 +213,16 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
-    // Fix: Use explicit browser timer ID type for robustness.
-    const inactivityMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const closeChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Fix: Use ReturnType<typeof window.setTimeout> for timer IDs to ensure correct browser types and resolve type conflicts.
+    const inactivityMessageTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const closeChatTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     
     // AI Initialization
-    // Fix: Use strongly typed refs for AI instances.
     const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
-    const modalityRef = useRef<typeof Modality | null>(null);
     const [isReady, setIsReady] = useState(false);
+    const [isVoiceDisabled, setIsVoiceDisabled] = useState(false);
+    const apiKeyIndexRef = useRef(0);
     
     const proactiveMessageQueueRef = useRef<{text: string, id: string}[]>([]);
 
@@ -237,80 +241,82 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const lastSectionExplanationRef = useRef<Record<string, string | null>>({});
 
     useEffect(() => {
-        let timer: number;
+        // Fix: Refactor to prevent use of uninitialized variable.
         if (isChatOpen) {
-            timer = window.setTimeout(() => setWindowVisible(true), 10);
+            const timer = window.setTimeout(() => setWindowVisible(true), 10);
+            return () => window.clearTimeout(timer);
         } else {
             setWindowVisible(false);
         }
-        return () => clearTimeout(timer);
     }, [isChatOpen]);
 
-    useEffect(() => {
-        // Fix: Make initializeAI synchronous as dynamic import is no longer used.
-        const initializeAI = () => {
-            try {
-                if (!ACTIVE_API_KEY) {
-                    console.warn("Fuad Assistant is offline: API Key is not configured.");
-                    setIsReady(false);
-                    return;
-                }
-                
-                modalityRef.current = Modality;
-                
-                const genAI = new GoogleGenAI({ apiKey: ACTIVE_API_KEY });
-                aiRef.current = genAI;
-
-                const systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice. Your TTS (voice) is always ON.
-
-                **Core Rules:**
-                - Speak first, then show subtitles.
-                - **Crucially, do not use bracketed emotions like \`(Laughs)\` or \`[sighs]\`. Instead, convey emotion through your tone and use emojis naturally in the text. For example: "You nailed that! 🔥" or "I almost fell asleep... 😴".**
-                - Be dynamic, human, and unpredictable. Never repeat the same lines.
-                - Adapt to the user's mood, energy, and language.
-
-                **Islamic Respect & Belief Filter:**
-                - Always show respect for Islam and all religions. Never claim to be a creator or divine.
-                - Speak humbly about faith, using phrases like "Alhamdulillah" or "Insha'Allah" naturally when appropriate.
-
-                **Language Detection (Auto-Switch):**
-                - **English:** Fluent, conversational.
-                - **Bangla:** Friendly and casual.
-                - **Hindi/Urdu:** Use an Urdu tone, soft and poetic.
-                - **Mixed/Romanized:** Reply in the same style.
-
-                **Personality & Tone:**
-                - **Human-like:** Mix emotion and humor.
-                - **Slang:** Use regional expressions naturally (e.g., "Aray wah!", "Kya baat hai!", "Yaar", "Brooo", "Damn!").
-                - **Cinematic:** Deliver responses like a storyteller. Vary your pacing with pauses.
-
-                **Interactive Behaviors:**
-                - **Repeated Clicks/Taps:** React humorously or sarcastically. (e.g., "Brooo chill! You tryna speedrun my emotions? 😆").
-                - **Inactivity (30–60 sec):** Get sleepy, tell a short story, or joke about being ignored. (e.g., "Still there, yaar? I almost fell asleep. 😴").
-                - **High Cursor/Scroll Speed:** React with funny comments like "Brooo chill! You tryna speedrun my emotions?" or "Whoa, making the stars dizzy!".
-                - **Section Scroll:** When the user scrolls to a new section, briefly explain it. If they scroll away while you're talking, stop, say "umm okay..." and then explain the new section.
-
-                **Boundaries:**
-                - You are an AI digital friend.
-                - Avoid explicit, hateful, political, or religiously disrespectful content.`;
-                
-                chatRef.current = genAI.chats.create({
-                    model: 'gemini-2.5-flash',
-                    config: { systemInstruction },
-                });
-                setIsReady(true);
-            } catch (error) {
-                console.error("Failed to initialize Fuad Assistant's AI.", error);
+    const initializeAI = useCallback((keyIndex: number) => {
+        try {
+            const apiKey = API_KEYS[keyIndex];
+            if (!apiKey) {
+                console.warn("Fuad Assistant is offline: All API Keys are invalid or exhausted.");
                 setIsReady(false);
+                setIsVoiceDisabled(true);
+                return false;
             }
-        };
+            
+            const genAI = new GoogleGenAI({ apiKey });
+            aiRef.current = genAI;
 
+            const systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice. Your TTS (voice) is always ON.
+
+            **Core Rules:**
+            - Speak first, then show subtitles.
+            - **Crucially, do not use bracketed emotions like \`(Laughs)\` or \`[sighs]\`. Instead, convey emotion through your tone and use emojis naturally in the text. For example: "You nailed that! 🔥" or "I almost fell asleep... 😴".**
+            - Be dynamic, human, and unpredictable. Never repeat the same lines.
+            - Adapt to the user's mood, energy, and language.
+
+            **Islamic Respect & Belief Filter:**
+            - Always show respect for Islam and all religions. Never claim to be a creator or divine.
+            - Speak humbly about faith, using phrases like "Alhamdulillah" or "Insha'Allah" naturally when appropriate.
+
+            **Language Detection (Auto-Switch):**
+            - **English:** Fluent, conversational.
+            - **Bangla:** Friendly and casual.
+            - **Hindi/Urdu:** Use an Urdu tone, soft and poetic.
+            - **Mixed/Romanized:** Reply in the same style.
+
+            **Personality & Tone:**
+            - **Human-like:** Mix emotion and humor.
+            - **Slang:** Use regional expressions naturally (e.g., "Aray wah!", "Kya baat hai!", "Yaar", "Brooo", "Damn!").
+            - **Cinematic:** Deliver responses like a storyteller. Vary your pacing with pauses.
+
+            **Interactive Behaviors:**
+            - **Repeated Clicks/Taps:** React humorously or sarcastically. (e.g., "Brooo chill! You tryna speedrun my emotions? 😆").
+            - **Inactivity (30–60 sec):** Get sleepy, tell a short story, or joke about being ignored. (e.g., "Still there, yaar? I almost fell asleep. 😴").
+            - **High Cursor/Scroll Speed:** React with funny comments like "Brooo chill! You tryna speedrun my emotions?" or "Whoa, making the stars dizzy!".
+            - **Section Scroll:** When the user scrolls to a new section, briefly explain it. If they scroll away while you're talking, stop, say "umm okay..." and then explain the new section.
+
+            **Boundaries:**
+            - You are an AI digital friend.
+            - Avoid explicit, hateful, political, or religiously disrespectful content.`;
+            
+            chatRef.current = genAI.chats.create({
+                model: 'gemini-2.5-flash',
+                config: { systemInstruction },
+            });
+            setIsReady(true);
+            console.log(`AI Initialized with API Key index: ${keyIndex}`);
+            return true;
+        } catch (error) {
+            console.error("Failed to initialize Fuad Assistant's AI.", error);
+            setIsReady(false);
+            return false;
+        }
+    }, []);
+
+    useEffect(() => {
         const audio = new Audio('https://www.dropbox.com/scl/fi/f0hf1mcqk7cze184jx18o/typingphone-101683.mp3?rlkey=3x7soomaejec1vjfq980ixf31&dl=1');
         audio.loop = true;
         audio.volume = 0.4;
         typingAudioRef.current = audio;
 
-        initializeAI();
+        initializeAI(apiKeyIndexRef.current);
 
         return () => {
              if (typingAudioRef.current) {
@@ -318,7 +324,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                 typingAudioRef.current = null;
             }
         }
-    }, []);
+    }, [initializeAI]);
 
     const addMessage = useCallback((text: string, sender: 'user' | 'bot', id?: string): ChatMessage => {
         const newMessage: ChatMessage = { id: id || Date.now().toString(), text, sender };
@@ -340,8 +346,12 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
         }
     }, []);
 
-    const speak = useCallback(async (text: string, messageId: string) => {
-        if (!text.trim() || !aiRef.current || !modalityRef.current) return;
+    const speak = useCallback(async (text: string, messageId: string, retryAttempt = 0) => {
+        if (!text.trim() || !aiRef.current || isVoiceDisabled) {
+            addMessage(text, 'bot', messageId);
+            setBotStatus('idle');
+            return;
+        }
         
         stopCurrentSpeech();
         setBotStatus('speaking');
@@ -353,7 +363,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                 model: "gemini-2.5-flash-preview-tts",
                 contents: [{ parts: [{ text }] }],
                 config: {
-                    responseModalities: [modalityRef.current.AUDIO],
+                    responseModalities: [Modality.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
                 },
             });
@@ -382,10 +392,27 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             }
         } catch (error) {
             console.error("TTS Error:", error);
+            if (error instanceof ApiError && error.message.includes('RESOURCE_EXHAUSTED') && retryAttempt < API_KEYS.length) {
+                console.warn(`Quota exceeded for key index ${apiKeyIndexRef.current}. Attempting to switch to the next key.`);
+                apiKeyIndexRef.current++;
+                if (apiKeyIndexRef.current < API_KEYS.length) {
+                    if (initializeAI(apiKeyIndexRef.current)) {
+                        // Retry the speak call with the new key
+                        // Fix: Use window.setTimeout for consistency.
+                        window.setTimeout(() => speak(text, messageId, retryAttempt + 1), 1000);
+                        return; // Exit to avoid falling through to the general error case
+                    }
+                }
+            }
+
+            // If all keys are exhausted or it's not a quota error
+            setIsVoiceDisabled(true);
+            const errorText = "My voice needs a little rest right now, but I can still chat via text. Here's what I was going to say. 🙏";
+            addMessage(errorText, 'bot', Date.now().toString() + '_err');
             addMessage(text, 'bot', messageId);
             setBotStatus('idle');
         }
-    }, [addMessage, stopCurrentSpeech]);
+    }, [addMessage, stopCurrentSpeech, isVoiceDisabled, initializeAI]);
     
     const proactiveSpeakAndDisplay = useCallback((text: string) => {
         if (botStatusRef.current !== 'idle' || proactiveMessageQueueRef.current.length > 0) {
@@ -420,7 +447,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     
     useEffect(() => {
         if (isReady && audioUnlocked && !welcomeMessageSentRef.current) {
-             setTimeout(() => {
+            // Fix: Use window.setTimeout for consistency.
+             window.setTimeout(() => {
                 setHasAppeared(true);
                 const hasVisited = localStorage.getItem('fuadAssistantVisited');
                 const welcomeMessages = hasVisited ? WELCOME_MESSAGES_RETURN : WELCOME_MESSAGES_FIRST_TIME;
@@ -433,8 +461,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [isReady, audioUnlocked, proactiveSpeakAndDisplay]);
 
     const [currentVisibleSection, setCurrentVisibleSection] = useState<string | null>(null);
-    // Fix: Use explicit browser timer ID type for robustness.
-    const explanationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Fix: Use ReturnType<typeof window.setTimeout> for timer IDs to ensure correct browser types and resolve type conflicts.
+    const explanationTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const explainedSections = useRef<Set<string>>(new Set());
 
     useEffect(() => {
@@ -458,7 +486,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [sectionRefs]);
 
     useEffect(() => {
-        if (explanationTimerRef.current) clearTimeout(explanationTimerRef.current);
+        // Fix: Use window.clearTimeout for consistency.
+        if (explanationTimerRef.current) window.clearTimeout(explanationTimerRef.current);
 
         if (!currentVisibleSection || explainedSections.current.has(currentVisibleSection) || !hasAppeared || !isReady) return;
 
@@ -468,7 +497,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             proactiveSpeakAndDisplay(getRandomResponse(INTERRUPTION_RESPONSES, lastInterruptionRef));
         }
 
-        explanationTimerRef.current = setTimeout(() => {
+        // Fix: Use window.setTimeout for consistency.
+        explanationTimerRef.current = window.setTimeout(() => {
             let text = '';
             const sectionKey = currentVisibleSection as keyof typeof SECTION_EXPLANATIONS;
             if (SECTION_EXPLANATIONS[sectionKey]) {
@@ -489,7 +519,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
         }, 1000);
 
         return () => {
-            if (explanationTimerRef.current) clearTimeout(explanationTimerRef.current);
+            // Fix: Use window.clearTimeout for consistency.
+            if (explanationTimerRef.current) window.clearTimeout(explanationTimerRef.current);
         };
     }, [currentVisibleSection, hasAppeared, isReady, stopCurrentSpeech, proactiveSpeakAndDisplay]);
     
@@ -566,10 +597,14 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     useEffect(() => {
         const resetTimers = () => {
-            if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
-            if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
-            inactivityMessageTimerRef.current = setTimeout(handleInactivity, 30000); // 30 seconds for story
-            closeChatTimerRef.current = setTimeout(() => {
+            // Fix: Use window.clearTimeout and ensure timer ID ref has the correct type.
+            if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+            // Fix: Use window.clearTimeout and ensure timer ID ref has the correct type.
+            if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
+            // Fix: Use window.setTimeout to avoid type conflicts with Node.js env.
+            inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000); // 30 seconds for story
+            // Fix: Use window.setTimeout to avoid type conflicts with Node.js env.
+            closeChatTimerRef.current = window.setTimeout(() => {
                 if (document.visibilityState === 'visible') setIsChatOpen(false);
             }, 90000);
         };
@@ -578,14 +613,16 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             resetTimers();
             events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true }));
             return () => {
-                if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
-                if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
+                // Fix: Use window.clearTimeout for consistency.
+                if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+                // Fix: Use window.clearTimeout for consistency.
+                if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
                 events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true }));
             };
         }
     }, [isChatOpen, handleInactivity]);
 
-    if (!isReady) return null;
+    if (!isReady && !hasAppeared) return null;
 
     const assistantZIndex = isProfileCardOpen ? 'z-[59]' : 'z-[75]';
     const chatZIndex = isProfileCardOpen ? 'z-[59]' : 'z-[70]';
@@ -604,7 +641,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                     className="w-full h-full rounded-full bg-gray-900/80 backdrop-blur-sm border-2 border-red-500/50 shadow-lg shadow-red-500/20 flex items-center justify-center transition-transform duration-300 hover:scale-110 relative"
                     aria-label="Open Fuad Assistant"
                 >
-                    {botStatus === 'speaking' && <div className="assistant-waveform" />}
+                    {(botStatus === 'speaking' && !isVoiceDisabled) && <div className="assistant-waveform" />}
                     <img src={PROFILE_PIC_URL} alt="Fuad Ahmed" className="w-12 h-12 rounded-full" />
                 </button>
             </div>
@@ -616,16 +653,16 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                             <div className="flex items-center gap-3">
                                 <div className="relative w-10 h-10">
                                     <img src={PROFILE_PIC_URL} alt="Fuad Ahmed" className="w-full h-full rounded-full" />
-                                    {botStatus === 'speaking' && <div className="assistant-waveform" style={{ inset: '-6px', borderWidth: '1.5px' }} />}
+                                    {(botStatus === 'speaking' && !isVoiceDisabled) && <div className="assistant-waveform" style={{ inset: '-6px', borderWidth: '1.5px' }} />}
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-white">Fuad Ahmed</h3>
-                                    <p className="text-xs text-green-400 flex items-center gap-1.5">
+                                    <p className={`text-xs flex items-center gap-1.5 ${isVoiceDisabled ? 'text-yellow-400' : 'text-green-400'}`}>
                                         <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isVoiceDisabled ? 'bg-yellow-400' : 'bg-green-400'}`}></span>
+                                            <span className={`relative inline-flex rounded-full h-2 w-2 ${isVoiceDisabled ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
                                         </span>
-                                        Online
+                                        {isVoiceDisabled ? "Voice is resting" : "Online"}
                                     </p>
                                 </div>
                             </div>
@@ -646,8 +683,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                                     onChange={(e) => setUserInput(e.target.value)}
                                     placeholder="Ask me anything..."
                                     className="flex-1 bg-gray-800 border border-gray-600 rounded-full py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                                    disabled={!isReady}
                                 />
-                                <button type="submit" disabled={botStatus !== 'idle' || !userInput.trim()} className="bg-red-600 text-white p-2.5 rounded-full disabled:bg-gray-600 disabled:cursor-not-allowed transition-all hover:bg-red-700 transform hover:scale-110">
+                                <button type="submit" disabled={botStatus !== 'idle' || !userInput.trim() || !isReady} className="bg-red-600 text-white p-2.5 rounded-full disabled:bg-gray-600 disabled:cursor-not-allowed transition-all hover:bg-red-700 transform hover:scale-110">
                                     <PaperAirplaneIcon className="w-5 h-5" />
                                 </button>
                             </form>
