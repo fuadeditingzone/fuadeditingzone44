@@ -166,10 +166,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     useEffect(() => {
         const initializeAI = async () => {
             try {
-                // Hardcode the API key directly for maximum reliability in this environment.
-                const apiKey = 'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E';
-                
-                if (!apiKey) {
+                // API key is sourced from environment variables as per guidelines.
+                if (!process.env.API_KEY) {
                     console.warn("Fuad Assistant is offline: API Key is not configured.");
                     setIsReady(false);
                     return;
@@ -179,7 +177,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                 const { GoogleGenAI, Modality } = await import('@google/genai');
                 modalityRef.current = Modality; // Store for later use
                 
-                const genAI = new GoogleGenAI({ apiKey });
+                const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 aiRef.current = genAI;
 
                 const systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
@@ -542,7 +540,10 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
                         {/* Header */}
                         <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-white/10">
                             <div className="flex items-center gap-3">
-                                <img src={PROFILE_PIC_URL} alt="Fuad Ahmed" className="w-10 h-10 rounded-full" />
+                                <div className="relative w-10 h-10">
+                                    <img src={PROFILE_PIC_URL} alt="Fuad Ahmed" className="w-full h-full rounded-full" />
+                                    {botStatus === 'speaking' && <div className="assistant-waveform" style={{ inset: '-6px', borderWidth: '1.5px' }} />}
+                                </div>
                                 <div>
                                     <h3 className="font-bold text-white">Fuad Ahmed</h3>
                                     <p className="text-xs text-green-400 flex items-center gap-1.5">

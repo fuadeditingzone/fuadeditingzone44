@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useEffect } from 'react';
 
 interface GalaxyBackgroundProps {
@@ -40,6 +41,7 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             style={{ perspective: '600px', transition: 'transform 0.5s ease-out' }}
         >
             <div className="absolute inset-0 bg-black" />
+            <div className="galaxy-nebula" />
             <div className="hyperspace-container slow-down">
                  <div className="stars-plane stars-plane-1" />
                  <div className="stars-plane stars-plane-2" />

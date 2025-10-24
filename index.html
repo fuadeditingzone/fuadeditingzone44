@@ -296,6 +296,21 @@
         animation-duration: 35s;
       }
 
+      /* --- GALAXY NEBULA BACKGROUND --- */
+      @keyframes slow-pan {
+          from { background-position: 0% 50%; }
+          to { background-position: 100% 50%; }
+      }
+      .galaxy-nebula {
+          position: absolute;
+          inset: 0;
+          background-image: url('https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg');
+          background-size: cover;
+          background-position: center;
+          opacity: 0.25;
+          animation: slow-pan 180s linear infinite alternate;
+      }
+
       /* Bot Typing Indicator */
       .typing-indicator {
         display: flex;
