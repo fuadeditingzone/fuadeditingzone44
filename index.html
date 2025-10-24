@@ -44,9 +44,6 @@
         user-select: none; /* Standard */
         overflow-x: hidden;
       }
-      a, button, iframe {
-        cursor: none;
-      }
       h1, h2, h3, h4, h5, h6 {
         font-family: 'Poppins', sans-serif;
       }
@@ -369,6 +366,19 @@
       @keyframes message-enter-anim {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* System Cursor Styles for when Custom Cursor is hidden (e.g., typing) */
+      body.system-cursor-active {
+        cursor: default !important;
+      }
+      body.system-cursor-active a,
+      body.system-cursor-active button {
+        cursor: pointer !important;
+      }
+      body.system-cursor-active input[type="text"],
+      body.system-cursor-active textarea {
+        cursor: text !important;
       }
     </style>
   <script type="importmap">

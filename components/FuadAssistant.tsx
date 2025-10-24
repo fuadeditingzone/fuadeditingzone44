@@ -127,6 +127,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const [botStatus, setBotStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
     const [spokenMessage, setSpokenMessage] = useState<SpokenMessage | null>(null);
     const [isWindowVisible, setWindowVisible] = useState(false);
+    const welcomeMessageSentRef = useRef(false);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -281,14 +282,17 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
     }, []);
 
     const proactiveSpeakAndDisplay = useCallback((text: string) => {
-        const isAlreadyOpen = isChatOpen;
-        const newMessage = addMessage(text, 'bot');
-        if (!isAlreadyOpen) {
-          // If the chat wasn't open, we add it to the history but don't show it until opened.
-          // This logic seems fine, but we can refine if needed.
+        // To prevent spamming multiple proactive messages (e.g., from fast scrolling),
+        // we only queue a new one if the bot is currently idle and the queue is empty.
+        if (botStatus !== 'idle' || proactiveMessageQueueRef.current.length > 0) {
+            return;
         }
+        
+        // Add the message to the chat history UI
+        const newMessage = addMessage(text, 'bot');
+        // Add the message to the queue to be spoken
         proactiveMessageQueueRef.current.push({ text, id: newMessage.id });
-    }, [addMessage, isChatOpen]);
+    }, [addMessage, botStatus]);
 
 
     const handleSubmit = async (e?: React.FormEvent) => {
@@ -319,7 +323,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
     
     // Welcome Message
     useEffect(() => {
-        if (!isReady) return;
+        if (!isReady || welcomeMessageSentRef.current) return;
         const welcomeTimer = setTimeout(() => {
             setHasAppeared(true);
             const hasVisited = localStorage.getItem('fuadAssistantVisited');
@@ -332,6 +336,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
                 localStorage.setItem('fuadAssistantVisited', 'true');
             }
             proactiveSpeakAndDisplay(welcomeMessage);
+            welcomeMessageSentRef.current = true;
         }, 1000);
         return () => clearTimeout(welcomeTimer);
     }, [isReady, proactiveSpeakAndDisplay]);
@@ -350,7 +355,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
                 explainedSections.current.add(sectionName);
                 proactiveSpeakAndDisplay(text);
             }
-        }, [isVisible, text, sectionName, proactiveSpeakAndDisplay, isReady]);
+        }, [isVisible, text, sectionName, proactiveSpeakAndDisplay, isReady, hasAppeared]);
     };
 
     useSectionObserverHook(sectionRefs.portfolio, 'portfolio', "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨");

@@ -29,6 +29,14 @@ export const CustomCursor: React.FC<{ isVisible: boolean }> = ({ isVisible }) =>
     const [isTyping, setIsTyping] = useState(false);
     
     useEffect(() => {
+        if (isTyping) {
+            document.body.classList.add('system-cursor-active');
+        } else {
+            document.body.classList.remove('system-cursor-active');
+        }
+    }, [isTyping]);
+
+    useEffect(() => {
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         const cursorEl = cursorRef.current;
 
