@@ -211,8 +211,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const audioContextRef = useRef<AudioContext | null>(null);
     const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const chatWindowRef = useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const chatWindowRef = useRef<HTMLDivElement | null>(null);
     // Fix: Use ReturnType<typeof window.setTimeout> for timer IDs to ensure correct browser types and resolve type conflicts.
     const inactivityMessageTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const closeChatTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -597,6 +597,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     useEffect(() => {
         const resetTimers = () => {
+            // FIX: Ensure all timer functions are prefixed with `window.` to resolve type conflicts between Node.js and browser environments. This fixes the 'unknown' type error on timer refs.
             // Fix: Use window.clearTimeout and ensure timer ID ref has the correct type.
             if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
             // Fix: Use window.clearTimeout and ensure timer ID ref has the correct type.

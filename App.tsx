@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
 import { GRAPHIC_WORKS } from './constants';
@@ -313,8 +314,8 @@ export default function App() {
     <div className="text-white" onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
       <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
       <CustomCursor isVisible={true} />
+      <GalaxyBackground onLightningFlash={triggerLightningReflection} />
       <div className={`main-content ${isContentLoaded ? 'visible' : ''}`}>
-        <GalaxyBackground onLightningFlash={triggerLightningReflection} />
         <Header 
             onScrollTo={scrollToSection} 
             onProfileClick={() => {
@@ -325,6 +326,7 @@ export default function App() {
         />
         <main>
           <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
+          {/* FIX: `setActiveTab` was not defined. It should be `setActivePortfolioTab`. */}
           <div ref={sections.portfolio} id="portfolio"><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
           <div ref={sections.contact} id="contact"><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
         </main>
