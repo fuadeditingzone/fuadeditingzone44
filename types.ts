@@ -40,9 +40,11 @@ export interface ChatMessage {
   text: string;
   sender: 'user' | 'bot';
   isFinal?: boolean;
+  component?: React.ReactNode;
 }
 
 export interface User {
+  username: string;
   name: string;
   profession: string;
   role: 'client' | 'designer';

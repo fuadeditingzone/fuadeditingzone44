@@ -2,65 +2,116 @@ import React, { createContext, useState, useContext, useEffect, useMemo, useCall
 import type { User } from '../types';
 
 interface UserContextType {
-    user: User | null;
+    currentUser: User | null;
     isLocked: boolean;
-    login: (userData: User) => void;
+    register: (userData: User) => User | null;
     logout: () => void;
     lockSite: () => void;
+    isUsernameTaken: (username: string) => boolean;
+    findUsers: (query: string) => User[];
+    getUserByUsername: (username: string) => User | undefined;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const USER_DB_KEY = 'portfolioUserDatabase';
+const CURRENT_USER_KEY = 'portfolioCurrentUser';
+
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [users, setUsers] = useState<Record<string, User>>({});
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLocked, setIsLocked] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
 
     useEffect(() => {
         try {
-            const storedUser = localStorage.getItem('portfolioUser');
-            if (storedUser) {
-                setUser(JSON.parse(storedUser));
+            const storedUsers = localStorage.getItem(USER_DB_KEY);
+            const storedCurrentUser = localStorage.getItem(CURRENT_USER_KEY);
+            
+            if (storedUsers) {
+                setUsers(JSON.parse(storedUsers));
+            }
+            if (storedCurrentUser) {
+                setCurrentUser(JSON.parse(storedCurrentUser));
             }
         } catch (error) {
-            console.error("Failed to load user from local storage:", error);
+            console.error("Failed to load user data from local storage:", error);
         }
         setIsInitialized(true);
     }, []);
 
-    const login = useCallback((userData: User) => {
+    const persistUsers = (updatedUsers: Record<string, User>) => {
         try {
-            localStorage.setItem('portfolioUser', JSON.stringify(userData));
-            setUser(userData);
-            setIsLocked(false);
+            localStorage.setItem(USER_DB_KEY, JSON.stringify(updatedUsers));
         } catch (error) {
-            console.error("Failed to save user to local storage:", error);
+            console.error("Failed to save user database to local storage:", error);
         }
-    }, []);
+    };
+
+    const persistCurrentUser = (user: User | null) => {
+        try {
+            if (user) {
+                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+            } else {
+                localStorage.removeItem(CURRENT_USER_KEY);
+            }
+        } catch (error) {
+            console.error("Failed to save current user to local storage:", error);
+        }
+    }
+
+    const isUsernameTaken = useCallback((username: string) => {
+        return !!users[username.toLowerCase()];
+    }, [users]);
+
+    const register = useCallback((userData: User): User | null => {
+        const usernameLower = userData.username.toLowerCase();
+        if (isUsernameTaken(usernameLower)) {
+            return null;
+        }
+        const updatedUsers = { ...users, [usernameLower]: userData };
+        setUsers(updatedUsers);
+        setCurrentUser(userData);
+        persistUsers(updatedUsers);
+        persistCurrentUser(userData);
+        setIsLocked(false);
+        return userData;
+    }, [users, isUsernameTaken]);
 
     const logout = useCallback(() => {
-        try {
-            localStorage.removeItem('portfolioUser');
-            setUser(null);
-        } catch (error) {
-            console.error("Failed to remove user from local storage:", error);
-        }
+        setCurrentUser(null);
+        persistCurrentUser(null);
     }, []);
 
     const lockSite = useCallback(() => {
-        // Only lock if the user is not logged in
-        if (!user) {
+        if (!currentUser) {
             setIsLocked(true);
         }
-    }, [user]);
+    }, [currentUser]);
+
+    const findUsers = useCallback((query: string) => {
+        if (!query) return [];
+        const queryLower = query.toLowerCase();
+        return Object.values(users).filter((user: User) => 
+            user.username.toLowerCase().includes(queryLower) ||
+            user.name.toLowerCase().includes(queryLower)
+        );
+    }, [users]);
+
+    const getUserByUsername = useCallback((username: string) => {
+        return users[username.toLowerCase()];
+    }, [users]);
 
     const value = useMemo(() => ({
-        user,
-        isLocked: isInitialized && isLocked, // Only be locked after initialization
-        login,
+        currentUser,
+        isLocked: isInitialized && isLocked && !currentUser,
+        register,
         logout,
-        lockSite
-    }), [user, isLocked, login, logout, lockSite, isInitialized]);
+        lockSite,
+        isUsernameTaken,
+        findUsers,
+        getUserByUsername
+    }), [currentUser, isLocked, register, logout, lockSite, isUsernameTaken, findUsers, getUserByUsername, isInitialized]);
 
     return (
         <UserContext.Provider value={value}>

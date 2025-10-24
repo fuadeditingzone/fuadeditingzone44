@@ -1,21 +1,23 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User } from './types';
-import { GRAPHIC_WORKS } from './constants';
+import { GRAPHIC_WORKS, PROFILE_CREATION_SOUND, BACKGROUND_MUSIC_TRACKS } from './constants';
 import { UserProvider, useUser } from './contexts/UserContext';
 
 import { CustomCursor } from './components/CustomCursor';
-import { GalaxyBackground } from './components/StormyVFXBackground';
+import { StormyVFXBackground } from './components/StormyVFXBackground';
 import { Header } from './components/Header';
 import { Home, ServicesPopup } from './components/Home';
 import { Portfolio } from './components/Portfolio';
 import { Contact } from './components/Contact';
 import { AboutAndFooter } from './components/AboutAndFooter';
 import { ModalViewer, GalleryGridModal } from './components/ModalViewer';
-import { ProfileCard } from './components/ProfileCard';
+import { ProfileModal } from './components/ProfileModal';
 import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
 import { FuadAssistant } from './components/FuadAssistant';
 import { LoginModal } from './components/LoginModal';
+import { SearchResultsModal } from './components/SearchResultsModal';
+import { WelcomeScreen } from './components/WelcomeScreen';
 
 const AUDIO_SOURCES = {
   background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
@@ -39,13 +41,23 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
     }
 };
 
+type AppState = 'welcome' | 'entering' | 'entered';
+
 const AppContent = () => {
-  const { user, isLocked, lockSite } = useUser();
-  const [isContentLoaded, setIsContentLoaded] = useState(false);
+  const { currentUser, isLocked, lockSite, findUsers } = useUser();
+  const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [excessiveMovement, setExcessiveMovement] = useState(0);
   const [isParallaxActive, setIsParallaxActive] = useState(true);
+
+  // Modal States
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSearchResultsModalOpen, setIsSearchResultsModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
 
   const sections = { home: useRef<HTMLDivElement>(null), portfolio: useRef<HTMLDivElement>(null), contact: useRef<HTMLDivElement>(null), about: useRef<HTMLDivElement>(null) };
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -64,16 +76,46 @@ const AppContent = () => {
   const movementIntensity = useRef(0);
   const movementTimeout = useRef<number | null>(null);
 
-  // 10-minute timer to lock the site for guests
-  useEffect(() => {
-    if (user || isLocked) return; // Don't run if logged in or already locked
-    
-    const timer = setTimeout(() => {
-        lockSite();
-    }, 10 * 60 * 1000); // 10 minutes
+  // Music Player Refs & State
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const profileSfxRef = useRef<HTMLAudioElement | null>(null);
+  const [currentTrack, setCurrentTrack] = useState(-1);
 
+  const handleEnter = useCallback(() => {
+    setAppState('entering');
+    startBackgroundAudio(); 
+    setAudioUnlocked(true);
+  }, []);
+
+  useEffect(() => {
+    if (appState === 'entering') {
+      const timer = setTimeout(() => {
+        setAppState('entered');
+      }, 2000); 
+      return () => clearTimeout(timer);
+    }
+  }, [appState]);
+
+  useEffect(() => {
+    if (currentUser || isLocked || appState !== 'entered') return;
+    const timer = setTimeout(() => {
+      lockSite();
+      setIsLoginModalOpen(true);
+    }, 10 * 60 * 1000);
     return () => clearTimeout(timer);
-  }, [user, isLocked, lockSite]);
+  }, [currentUser, isLocked, lockSite, appState]);
+
+  const handleSearch = (query: string) => {
+      const results = findUsers(query);
+      setSearchResults(results);
+      setIsSearchResultsModalOpen(true);
+  };
+
+  const viewProfile = (user: User) => {
+      setViewingUser(user);
+      setIsSearchResultsModalOpen(false);
+      setIsProfileModalOpen(true);
+  };
 
   const scrollToSection = useCallback((section: keyof typeof sections) => {
     const sectionElement = sections[section].current;
@@ -82,8 +124,6 @@ const AppContent = () => {
         sectionElement.scrollIntoView({ behavior: 'smooth' });
     }
   }, [sections]);
-
-  useEffect(() => { setIsContentLoaded(true); }, []);
 
   const startBackgroundAudio = useCallback(() => {
     if (audioContextStarted.current) return;
@@ -100,7 +140,16 @@ const AppContent = () => {
     } else { audioContextStarted.current = false; }
   }, []);
 
-  useEffect(() => { Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); }, []);
+  useEffect(() => { 
+    Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); 
+    const musicAudio = new Audio();
+    musicAudio.loop = true;
+    musicAudioRef.current = musicAudio;
+    
+    const sfxAudio = new Audio(PROFILE_CREATION_SOUND);
+    sfxAudio.volume = 0.7;
+    profileSfxRef.current = sfxAudio;
+  }, []);
   
   useEffect(() => {
     const handleMouseOver = (event: MouseEvent) => {
@@ -122,14 +171,14 @@ const AppContent = () => {
         const now = Date.now();
         const timeDelta = now - lastMousePosition.current.time;
 
-        if (timeDelta < 10) return; // Debounce frequent events
+        if (timeDelta < 10) return;
 
         const distance = Math.sqrt(Math.pow(clientX - lastMousePosition.current.x, 2) + Math.pow(clientY - lastMousePosition.current.y, 2));
         const speed = distance / timeDelta;
 
         lastMousePosition.current = { x: clientX, y: clientY, time: now };
 
-        if (speed > 8) { // High speed threshold
+        if (speed > 8) {
             movementIntensity.current += 1;
         }
 
@@ -140,10 +189,9 @@ const AppContent = () => {
 
         if (movementIntensity.current > 20) {
             setExcessiveMovement(c => c + 1);
-            movementIntensity.current = 0; // Reset after triggering
+            movementIntensity.current = 0;
         }
     }, []);
-
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -211,7 +259,6 @@ const AppContent = () => {
     };
   }, [handleMovement]);
   
-  // Effect for canvas setup and animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -245,7 +292,6 @@ const AppContent = () => {
 }, []);
   
   const [modalState, setModalState] = useState<{ items: ModalItem[]; currentIndex: number } | null>(null);
-  const [isProfileCardOpen, setIsProfileCardOpen] = useState(false);
   const [orderModalState, setOrderModalState] = useState<{ isOpen: boolean; mode: 'whatsapp' | 'email' } | null>(null);
   const [isReflecting, setIsReflecting] = useState(false);
   const reflectTimeoutRef = useRef<number | null>(null);
@@ -258,24 +304,21 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  useEffect(() => { const isAnyModalOpen = modalState || isProfileCardOpen || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, isProfileCardOpen, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen]);
+  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isLoginModalOpen, isSearchResultsModalOpen, isProfileModalOpen]);
   
   useEffect(() => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
     const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying;
-    const shouldMute = isAnyVideoPlaying;
+    const shouldMute = isAnyVideoPlaying || currentTrack > -1;
     const backgroundAudio = audioRefs.current.background;
     if (backgroundAudio) {
       backgroundAudio.volume = shouldMute ? 0 : AUDIO_SOURCES.background.volume;
     }
-  }, [modalState, isVfxVideoPlaying]);
+  }, [modalState, isVfxVideoPlaying, currentTrack]);
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
-    if (!audioContextStarted.current) {
-        startBackgroundAudio();
-        setAudioUnlocked(true);
-    } else {
-        safePlay(audioRefs.current.click?.play());
+    if (audioContextStarted.current) {
+      safePlay(audioRefs.current.click?.play());
     }
     const target = e.target as HTMLElement;
     const isInteractive = target.closest('a, button');
@@ -285,7 +328,7 @@ const AppContent = () => {
         target.classList.add('animate-text-bounce');
         setTimeout(() => target.classList.remove('animate-text-bounce'), 300);
     }
-  }, [startBackgroundAudio]);
+  }, []);
   
   const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -323,19 +366,54 @@ const AppContent = () => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [contextMenu]);
+  
+  const handleRegisterSuccess = useCallback((newUser: User) => {
+    if (profileSfxRef.current) {
+      profileSfxRef.current.currentTime = 0;
+      safePlay(profileSfxRef.current.play());
+    }
+    setNewlyRegisteredUser(newUser);
+  }, []);
+
+  // --- Music Player Controls ---
+  const playMusic = useCallback((trackIndex: number) => {
+    const musicAudio = musicAudioRef.current;
+    if (!musicAudio || !BACKGROUND_MUSIC_TRACKS[trackIndex]) return false;
+    musicAudio.src = BACKGROUND_MUSIC_TRACKS[trackIndex].url;
+    safePlay(musicAudio.play());
+    setCurrentTrack(trackIndex);
+    return true;
+  }, []);
+
+  const pauseMusic = useCallback(() => {
+    musicAudioRef.current?.pause();
+    setCurrentTrack(-1);
+    return true;
+  }, []);
+
+  const setVolume = useCallback((volume: number) => {
+    const newVolume = Math.max(0, Math.min(1, volume / 100));
+    const backgroundAudio = audioRefs.current.background;
+    const musicAudio = musicAudioRef.current;
+    if (backgroundAudio) backgroundAudio.volume = newVolume * 0.3; // Keep ambient lower
+    if (musicAudio) musicAudio.volume = newVolume;
+    return true;
+  }, []);
 
   return (
-    <div className={`text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
-      <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
-      <CustomCursor isVisible={!isLocked} />
-      <GalaxyBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} />
-      <div className={`main-content ${isContentLoaded ? 'visible' : ''}`}>
+    <div className={`root-container state-${appState}`}>
+      <StormyVFXBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} appState={appState} />
+      <WelcomeScreen onEnter={handleEnter} />
+      
+      <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+        <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
+        <CustomCursor isVisible={!isLocked} />
+        
         <Header 
             onScrollTo={scrollToSection} 
-            onProfileClick={() => {
-                safePlay(audioRefs.current.profileClick?.play());
-                setIsProfileCardOpen(true);
-            }} 
+            onLoginClick={() => setIsLoginModalOpen(true)}
+            onViewProfile={viewProfile}
+            onSearch={handleSearch}
             isReflecting={isReflecting} 
         />
         <main>
@@ -344,15 +422,39 @@ const AppContent = () => {
           <div ref={sections.contact} id="contact"><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
         </main>
         <div ref={sections.about} id="about"><AboutAndFooter isReflecting={isReflecting} /></div>
+        
         {modalState && <ModalViewer state={modalState} onClose={closeModal} onNext={showNext} onPrev={showPrev} />}
         {isGalleryGridOpen && <GalleryGridModal items={GRAPHIC_WORKS} onClose={() => setIsGalleryGridOpen(false)} onImageClick={openSingleImageViewer} />}
         {singleImageViewerState && <ModalViewer state={singleImageViewerState} onClose={() => setSingleImageViewerState(null)} onNext={showNextInSingleImageViewer} onPrev={showPrevInSingleImageViewer} />}
         {isServicesPopupOpen && <ServicesPopup onClose={() => setIsServicesPopupOpen(false)} />}
-        {isProfileCardOpen && <ProfileCard onClose={() => setIsProfileCardOpen(false)} />}
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
+        
+        {appState === 'entered' && (
+          <FuadAssistant 
+            sectionRefs={sections} 
+            audioUnlocked={audioUnlocked} 
+            isProfileCardOpen={isProfileModalOpen} 
+            onExcessiveMovement={excessiveMovement} 
+            user={currentUser} 
+            isLocked={isLocked} 
+            setIsParallaxActive={setIsParallaxActive}
+            newlyRegisteredUser={newlyRegisteredUser}
+            onNewUserHandled={() => setNewlyRegisteredUser(null)}
+            playMusic={playMusic}
+            pauseMusic={pauseMusic}
+            setVolume={setVolume}
+          />
+        )}
       </div>
-      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileCardOpen} onExcessiveMovement={excessiveMovement} user={user} isLocked={isLocked} setIsParallaxActive={setIsParallaxActive} />
+
+      {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={() => { setIsProfileModalOpen(false); setViewingUser(null); }} />}
+      {isLoginModalOpen && <LoginModal onClose={() => setIsLoginModalOpen(false)} onRegisterSuccess={handleRegisterSuccess} />}
+      {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
+
+      {isLocked && !isLoginModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
+      )}
     </div>
   );
 }
@@ -360,22 +462,7 @@ const AppContent = () => {
 export default function App() {
     return (
         <UserProvider>
-            <AppLockWrapper />
+            <AppContent />
         </UserProvider>
     );
 }
-
-const AppLockWrapper = () => {
-    const { isLocked } = useUser();
-    return (
-        <>
-            <AppContent />
-            {isLocked && (
-                <>
-                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
-                    <LoginModal />
-                </>
-            )}
-        </>
-    );
-};

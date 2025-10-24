@@ -1,13 +1,12 @@
-
-
 import React, { useRef, useEffect } from 'react';
 
-interface GalaxyBackgroundProps {
+interface StormyVFXBackgroundProps {
   onLightningFlash: () => void;
   isParallaxActive: boolean;
+  appState: 'welcome' | 'entering' | 'entered';
 }
 
-export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningFlash, isParallaxActive }) => {
+export const StormyVFXBackground: React.FC<StormyVFXBackgroundProps> = ({ onLightningFlash, isParallaxActive, appState }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -15,6 +14,7 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
         if (!container) return;
 
         const handleMouseMove = (event: MouseEvent) => {
+            if (appState !== 'entered') return; // Only apply parallax after intro
             const { clientX, clientY } = event;
             const x = (clientX / window.innerWidth - 0.5) * 5; // degrees
             const y = (clientY / window.innerHeight - 0.5) * -5; // degrees
@@ -28,7 +28,6 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             container.style.transform = 'rotateY(0deg) rotateX(0deg)';
         }
 
-
         const flashInterval = setInterval(() => {
             if (Math.random() < 0.1) {
                 onLightningFlash();
@@ -39,7 +38,7 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             window.removeEventListener('mousemove', handleMouseMove);
             clearInterval(flashInterval);
         };
-    }, [onLightningFlash, isParallaxActive]);
+    }, [onLightningFlash, isParallaxActive, appState]);
 
     return (
         <div 
@@ -48,7 +47,7 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             style={{ perspective: '600px', transition: 'transform 0.5s ease-out' }}
         >
             <div className="galaxy-nebula" />
-            <div className="hyperspace-container slow-down">
+            <div className={`hyperspace-container ${appState === 'entered' ? 'slow-down' : ''}`}>
                  <div className="stars-plane stars-plane-1" />
                  <div className="stars-plane stars-plane-2" />
                  <div className="stars-plane stars-plane-3" />
