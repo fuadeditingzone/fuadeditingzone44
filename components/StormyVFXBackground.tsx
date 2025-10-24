@@ -4,9 +4,10 @@ import React, { useRef, useEffect } from 'react';
 
 interface GalaxyBackgroundProps {
   onLightningFlash: () => void;
+  isParallaxActive: boolean;
 }
 
-export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningFlash }) => {
+export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningFlash, isParallaxActive }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -20,7 +21,13 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             container.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
         };
 
-        window.addEventListener('mousemove', handleMouseMove);
+        if (isParallaxActive) {
+            window.addEventListener('mousemove', handleMouseMove);
+        } else {
+            // Reset transform when parallax is inactive for a smooth stop
+            container.style.transform = 'rotateY(0deg) rotateX(0deg)';
+        }
+
 
         const flashInterval = setInterval(() => {
             if (Math.random() < 0.1) {
@@ -32,7 +39,7 @@ export const GalaxyBackground: React.FC<GalaxyBackgroundProps> = ({ onLightningF
             window.removeEventListener('mousemove', handleMouseMove);
             clearInterval(flashInterval);
         };
-    }, [onLightningFlash]);
+    }, [onLightningFlash, isParallaxActive]);
 
     return (
         <div 

@@ -33,7 +33,6 @@ export interface Service {
 export type PortfolioTab = 'graphic' | 'vfx';
 export type VfxSubTab = 'anime' | 'vfxEdits';
 
-// Fix: Add missing type definitions for the Chat component.
 export type Language = 'en' | 'bn' | 'hi' | 'ur';
 
 export interface ChatMessage {
@@ -41,4 +40,11 @@ export interface ChatMessage {
   text: string;
   sender: 'user' | 'bot';
   isFinal?: boolean;
+}
+
+export interface User {
+  name: string;
+  profession: string;
+  role: 'client' | 'designer';
+  bio: string;
 }

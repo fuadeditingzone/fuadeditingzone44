@@ -1,8 +1,7 @@
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
+import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User } from './types';
 import { GRAPHIC_WORKS } from './constants';
+import { UserProvider, useUser } from './contexts/UserContext';
 
 import { CustomCursor } from './components/CustomCursor';
 import { GalaxyBackground } from './components/StormyVFXBackground';
@@ -16,6 +15,7 @@ import { ProfileCard } from './components/ProfileCard';
 import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
 import { FuadAssistant } from './components/FuadAssistant';
+import { LoginModal } from './components/LoginModal';
 
 const AUDIO_SOURCES = {
   background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
@@ -39,11 +39,13 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
     }
 };
 
-export default function App() {
+const AppContent = () => {
+  const { user, isLocked, lockSite } = useUser();
   const [isContentLoaded, setIsContentLoaded] = useState(false);
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [excessiveMovement, setExcessiveMovement] = useState(0);
+  const [isParallaxActive, setIsParallaxActive] = useState(true);
 
   const sections = { home: useRef<HTMLDivElement>(null), portfolio: useRef<HTMLDivElement>(null), contact: useRef<HTMLDivElement>(null), about: useRef<HTMLDivElement>(null) };
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -61,6 +63,17 @@ export default function App() {
   const stormSoundFadeInterval = useRef<number | null>(null);
   const movementIntensity = useRef(0);
   const movementTimeout = useRef<number | null>(null);
+
+  // 10-minute timer to lock the site for guests
+  useEffect(() => {
+    if (user || isLocked) return; // Don't run if logged in or already locked
+    
+    const timer = setTimeout(() => {
+        lockSite();
+    }, 10 * 60 * 1000); // 10 minutes
+
+    return () => clearTimeout(timer);
+  }, [user, isLocked, lockSite]);
 
   const scrollToSection = useCallback((section: keyof typeof sections) => {
     const sectionElement = sections[section].current;
@@ -312,10 +325,10 @@ export default function App() {
   }, [contextMenu]);
 
   return (
-    <div className="text-white relative isolate" onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+    <div className={`text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
       <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
-      <CustomCursor isVisible={true} />
-      <GalaxyBackground onLightningFlash={triggerLightningReflection} />
+      <CustomCursor isVisible={!isLocked} />
+      <GalaxyBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} />
       <div className={`main-content ${isContentLoaded ? 'visible' : ''}`}>
         <Header 
             onScrollTo={scrollToSection} 
@@ -327,7 +340,6 @@ export default function App() {
         />
         <main>
           <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
-          {/* FIX: `setActiveTab` was not defined. It should be `setActivePortfolioTab`. */}
           <div ref={sections.portfolio} id="portfolio"><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
           <div ref={sections.contact} id="contact"><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
         </main>
@@ -340,7 +352,30 @@ export default function App() {
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
       </div>
-      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileCardOpen} onExcessiveMovement={excessiveMovement} />
+      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileCardOpen} onExcessiveMovement={excessiveMovement} user={user} isLocked={isLocked} setIsParallaxActive={setIsParallaxActive} />
     </div>
   );
 }
+
+export default function App() {
+    return (
+        <UserProvider>
+            <AppLockWrapper />
+        </UserProvider>
+    );
+}
+
+const AppLockWrapper = () => {
+    const { isLocked } = useUser();
+    return (
+        <>
+            <AppContent />
+            {isLocked && (
+                <>
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
+                    <LoginModal />
+                </>
+            )}
+        </>
+    );
+};
