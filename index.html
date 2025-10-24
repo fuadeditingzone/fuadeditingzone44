@@ -62,6 +62,18 @@
       .btn-glow:hover {
         box-shadow: 0 0 20px rgba(229, 9, 20, 0.5), 0 0 10px rgba(229, 9, 20, 0.4);
       }
+      
+      /* --- Button Active/Pressed State --- */
+      /* Provides responsive visual feedback when buttons and button-like links are pressed. */
+      /* Increased specificity using an attribute selector [class] to override Tailwind's hover states. */
+      button[class]:active,
+      a[class*="group"]:active {
+        transform: scale(0.96);
+        filter: brightness(0.9);
+        /* Use a quick transition for a snappy "pressed" feel */
+        transition: transform 0.05s ease-in-out, filter 0.05s ease-in-out;
+      }
+
       .animate-fade-in {
         animation: fade-in 0.3s ease-out forwards;
       }

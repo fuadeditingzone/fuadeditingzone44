@@ -16,9 +16,10 @@ import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
 
 const AUDIO_SOURCES = {
-  background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.3, loop: true },
-  hover: { src: 'https://www.dropbox.com/scl/fi/f7lx8ated99isnron643v/hover-button-287656.mp3?rlkey=4l2w3wf4gv8w6l2tak5j1soxg&dl=1', volume: 0.5, loop: false },
+  background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
+  hover: { src: 'https://www.dropbox.com/scl/fi/n97lcyw8wizmd52xqzvk6/ui-sounds-pack-4-12-359738-1.mp3?rlkey=hsc3o5r8njrivygvn4wqw5fwi&dl=1', volume: 1, loop: false },
   click: { src: 'https://www.dropbox.com/scl/fi/kyhefzv1f8qbnax334rf5/anime-46068.mp3?rlkey=0mppg01wlork4wuk9d9yz23y3&dl=1', volume: 0.4, loop: false },
+  profileClick: { src: 'https://www.dropbox.com/scl/fi/bik802kmtwh60iqo6kwwj/sample_hover_subtle02_kofi_by_miraclei-364170.mp3?rlkey=i9k7olqzqhud63fmha7ilxjlu&dl=1', volume: 1, loop: false },
   navClick: { src: 'https://www.dropbox.com/scl/fi/ldbwrq2lowpvcr7p85bar/deep-and-cinematic-woosh-sound-effect-318325.mp3?rlkey=d9sld3dksm4d4859ij8i7cgbd&dl=1', volume: 0.25, loop: false },
   imageHover1: { src: 'https://www.dropbox.com/scl/fi/218n6slrzgy0hka3mhead/ui-sounds-pack-4-12-359738.mp3?rlkey=k9dvvo3sekx5mxj9gli27nmeo&dl=1', volume: 0.4, loop: false },
   imageHover2: { src: 'https://www.dropbox.com/scl/fi/nwskelkksaqzp5pw1ov6s/ui-sounds-pack-5-14-359755.mp3?rlkey=aarm0y1cmotx2yek37o6mkzoi&dl=1', volume: 0.4, loop: false },
@@ -46,7 +47,8 @@ export default function App() {
   const [singleImageViewerState, setSingleImageViewerState] = useState<{ items: GraphicWork[]; currentIndex: number } | null>(null);
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTab>('graphic');
   const [activeVfxSubTab, setActiveVfxSubTab] = useState<VfxSubTab>('anime');
-  const audioRefs = useRef<Record<keyof typeof AUDIO_SOURCES, HTMLAudioElement | null>>({ background: null, hover: null, click: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null });
+  const audioRefs = useRef<Record<keyof typeof AUDIO_SOURCES, HTMLAudioElement | null>>({ background: null, hover: null, click: null, profileClick: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const audioContextStarted = useRef(false);
   const canPlayMoveSound = useRef(true);
@@ -99,12 +101,33 @@ export default function App() {
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-        if (!audioContextStarted.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        
+        if (!audioContextStarted.current || !ctx) return;
+        
         const now = Date.now();
         const timeDelta = now - lastMousePosition.current.time;
-        if (timeDelta > 50) { 
+
+        if (timeDelta > 20) { // Check more frequently for smoother lines
             const distance = Math.sqrt(Math.pow(e.clientX - lastMousePosition.current.x, 2) + Math.pow(e.clientY - lastMousePosition.current.y, 2));
             const speed = distance / timeDelta;
+            
+            if (speed > 5) {
+                ctx.beginPath();
+                ctx.moveTo(lastMousePosition.current.x, lastMousePosition.current.y);
+                ctx.lineTo(e.clientX, e.clientY);
+                
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = Math.min(8, 2 + speed / 3); 
+                ctx.lineCap = 'round';
+                ctx.shadowColor = '#e50914';
+                ctx.shadowBlur = 25;
+                
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Reset shadow for performance
+            }
+
             if (speed > 3 && !isStormSoundPlaying.current) {
                 const stormAudio = audioRefs.current.storm;
                 if (stormAudio) {
@@ -132,6 +155,39 @@ export default function App() {
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
+  
+  // Effect for canvas setup and animation loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const setCanvasSize = () => {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.scale(dpr, dpr);
+    };
+
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
+
+    let animationFrameId: number;
+    const animate = () => {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+        animationFrameId = requestAnimationFrame(animate);
+    };
+    animate();
+
+    return () => {
+        window.removeEventListener('resize', setCanvasSize);
+        cancelAnimationFrame(animationFrameId);
+    };
+}, []);
   
   const [modalState, setModalState] = useState<{ items: ModalItem[]; currentIndex: number } | null>(null);
   const [isProfileCardOpen, setIsProfileCardOpen] = useState(false);
@@ -210,10 +266,18 @@ export default function App() {
 
   return (
     <div className="text-white" onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+      <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
       <CustomCursor isVisible={true} />
       <div className={`main-content ${isContentLoaded ? 'visible' : ''}`}>
         <GalaxyBackground onLightningFlash={triggerLightningReflection} />
-        <Header onScrollTo={scrollToSection} onProfileClick={() => setIsProfileCardOpen(true)} isReflecting={isReflecting} />
+        <Header 
+            onScrollTo={scrollToSection} 
+            onProfileClick={() => {
+                safePlay(audioRefs.current.profileClick?.play());
+                setIsProfileCardOpen(true);
+            }} 
+            isReflecting={isReflecting} 
+        />
         <main>
           <div ref={sections.home}><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
           <div ref={sections.portfolio}><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
