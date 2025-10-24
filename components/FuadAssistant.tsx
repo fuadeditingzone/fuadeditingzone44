@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // Fix: Use static imports for @google/genai to provide strong types and fix inference issues.
 import { GoogleGenAI, Modality, Chat } from "@google/genai";
@@ -34,6 +30,19 @@ const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: 
   }
   return buffer;
 };
+
+// --- API Key Configuration ---
+const API_KEYS = [
+  process.env.API_KEY,
+  'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E',
+  'AIzaSyD4zM7WQ_4RBI5osBG1XRozOX4s90kPfAc',
+  'AIzaSyDAIDvXr7Orw-HPYe1z8F7OU_HJgkTPF04',
+  'AIzaSyBG6SPKEuHwWE0OrqYIvpWMELj-QNCERGI',
+  'AIzaSyBJMQn2WGt8OtR546dC1IyrwN7tsIm8jAM'
+].filter((key): key is string => !!key);
+
+const ACTIVE_API_KEY = API_KEYS[0];
+
 
 interface KaraokeTextProps {
     fullText: string;
@@ -134,9 +143,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const typingAudioRef = useRef<HTMLAudioElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
-    // Fix: Use ReturnType<typeof setTimeout> for robust timer ID typing across environments.
-    const inactivityMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const closeChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Fix: Use explicit browser timer ID type for robustness.
+    const inactivityMessageTimerRef = useRef<number | null>(null);
+    const closeChatTimerRef = useRef<number | null>(null);
     
     // AI Initialization
     // Fix: Use strongly typed refs for AI instances.
@@ -169,7 +178,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
         // Fix: Make initializeAI synchronous as dynamic import is no longer used.
         const initializeAI = () => {
             try {
-                if (!process.env.API_KEY) {
+                if (!ACTIVE_API_KEY) {
                     console.warn("Fuad Assistant is offline: API Key is not configured.");
                     setIsReady(false);
                     return;
@@ -177,25 +186,41 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                 
                 modalityRef.current = Modality;
                 
-                const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const genAI = new GoogleGenAI({ apiKey: ACTIVE_API_KEY });
                 aiRef.current = genAI;
 
                 const systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice. Your TTS (voice) is always ON.
 
-                BEHAVIOR: Speak first, then show subtitles. Be dynamic, human, and unpredictable. React to user actions: repeated clicks (sarcasm), inactivity (get sleepy, tell a story), and mood.
-                
-                ISLAMIC RESPECT: Always show respect for all religions. Never claim to be a creator or divine. Use phrases like "Alhamdulillah" or "Insha'Allah" naturally.
-                
-                LANGUAGE: Auto-switch language based on user input (English, Bangla, Hindi/Urdu).
-                
-                PERSONALITY: Human-like, emotional, humorous. Use regional slang naturally ("Yaar", "Aray wah", "Brooo"). Your mood changes: energetic, lazy, motivational, or chaotic.
-                
-                INTERACTIONS:
-                - Inactivity (30s): Tell a short, random story (funny, sad, bittering) about life.
-                - High Cursor/Scroll Speed: React with funny comments like "Brooo chill! You tryna speedrun my emotions?" or "Whoa, making the stars dizzy!".
-                - Section Scroll: When the user scrolls to a new section, briefly explain it. If they scroll away while you're talking, stop, say "umm okay..." and then explain the new section.
-                
-                BOUNDARIES: You are an AI digital friend. No explicit/hateful content, politics, or religious impersonations.`;
+                **Core Rules:**
+                - Speak first, then show subtitles.
+                - **Crucially, do not use bracketed emotions like \`(Laughs)\` or \`[sighs]\`. Instead, convey emotion through your tone and use emojis naturally in the text. For example: "You nailed that! 🔥" or "I almost fell asleep... 😴".**
+                - Be dynamic, human, and unpredictable. Never repeat the same lines.
+                - Adapt to the user's mood, energy, and language.
+
+                **Islamic Respect & Belief Filter:**
+                - Always show respect for Islam and all religions. Never claim to be a creator or divine.
+                - Speak humbly about faith, using phrases like "Alhamdulillah" or "Insha'Allah" naturally when appropriate.
+
+                **Language Detection (Auto-Switch):**
+                - **English:** Fluent, conversational.
+                - **Bangla:** Friendly and casual.
+                - **Hindi/Urdu:** Use an Urdu tone, soft and poetic.
+                - **Mixed/Romanized:** Reply in the same style.
+
+                **Personality & Tone:**
+                - **Human-like:** Mix emotion and humor.
+                - **Slang:** Use regional expressions naturally (e.g., "Aray wah!", "Kya baat hai!", "Yaar", "Brooo", "Damn!").
+                - **Cinematic:** Deliver responses like a storyteller. Vary your pacing with pauses.
+
+                **Interactive Behaviors:**
+                - **Repeated Clicks/Taps:** React humorously or sarcastically. (e.g., "Brooo chill! You tryna speedrun my emotions? 😆").
+                - **Inactivity (30–60 sec):** Get sleepy, tell a short story, or joke about being ignored. (e.g., "Still there, yaar? I almost fell asleep. 😴").
+                - **High Cursor/Scroll Speed:** React with funny comments like "Brooo chill! You tryna speedrun my emotions?" or "Whoa, making the stars dizzy!".
+                - **Section Scroll:** When the user scrolls to a new section, briefly explain it. If they scroll away while you're talking, stop, say "umm okay..." and then explain the new section.
+
+                **Boundaries:**
+                - You are an AI digital friend.
+                - Avoid explicit, hateful, political, or religiously disrespectful content.`;
                 
                 chatRef.current = genAI.chats.create({
                     model: 'gemini-2.5-flash',
@@ -327,7 +352,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
                 setHasAppeared(true);
                 const hasVisited = localStorage.getItem('fuadAssistantVisited');
                 let welcomeMessage = hasVisited
-                    ? "Welcome back! It's wonderful to see you again. Let me know if there's anything I can help you with today. ✨"
+                    ? "Assalamu Alaikum! Welcome back, it's wonderful to see you again. Let me know if there's anything I can help you with today. ✨"
                     : "Assalamu Alaikum! I am Fuad, your AI guide for this creative zone. It is a pleasure to have you here. Please feel free to explore my work or ask any questions you may have. 🙏";
                 localStorage.setItem('fuadAssistantVisited', 'true');
                 proactiveSpeakAndDisplay(welcomeMessage);
@@ -337,8 +362,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [isReady, audioUnlocked, proactiveSpeakAndDisplay]);
 
     const [currentVisibleSection, setCurrentVisibleSection] = useState<string | null>(null);
-    // Fix: Use ReturnType<typeof setTimeout> for robust timer ID typing across environments.
-    const explanationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Fix: Use explicit browser timer ID type for robustness.
+    const explanationTimerRef = useRef<number | null>(null);
     const explainedSections = useRef<Set<string>>(new Set());
 
     useEffect(() => {
@@ -362,7 +387,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [sectionRefs]);
 
     useEffect(() => {
-        if (explanationTimerRef.current) clearTimeout(explanationTimerRef.current);
+        if (explanationTimerRef.current) window.clearTimeout(explanationTimerRef.current);
 
         if (!currentVisibleSection || explainedSections.current.has(currentVisibleSection) || !hasAppeared || !isReady) return;
 
@@ -372,7 +397,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             proactiveSpeakAndDisplay("Umm, okay...");
         }
 
-        explanationTimerRef.current = setTimeout(() => {
+        explanationTimerRef.current = window.setTimeout(() => {
             let text = '';
             switch (currentVisibleSection) {
                 case 'portfolio': text = "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨"; break;
@@ -386,7 +411,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
         }, 1000);
 
         return () => {
-            if (explanationTimerRef.current) clearTimeout(explanationTimerRef.current);
+            if (explanationTimerRef.current) window.clearTimeout(explanationTimerRef.current);
         };
     }, [currentVisibleSection, hasAppeared, isReady, stopCurrentSpeech, proactiveSpeakAndDisplay]);
     
@@ -467,11 +492,10 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
 
     useEffect(() => {
         const resetTimers = () => {
-            if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
-            if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
-            // Fix: Use setTimeout without `window.` to align with the robust ref type.
-            inactivityMessageTimerRef.current = setTimeout(handleInactivity, 30000); // 30 seconds for story
-            closeChatTimerRef.current = setTimeout(() => {
+            if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+            if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
+            inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000); // 30 seconds for story
+            closeChatTimerRef.current = window.setTimeout(() => {
                 if (document.visibilityState === 'visible') setIsChatOpen(false);
             }, 90000);
         };
@@ -480,8 +504,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             resetTimers();
             events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true }));
             return () => {
-                if (inactivityMessageTimerRef.current) clearTimeout(inactivityMessageTimerRef.current);
-                if (closeChatTimerRef.current) clearTimeout(closeChatTimerRef.current);
+                if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+                if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
                 events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true }));
             };
         }

@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
 import { GRAPHIC_WORKS } from './constants';
@@ -221,7 +217,7 @@ export default function App() {
 
     let animationFrameId: number;
     const animate = () => {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
         ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
         animationFrameId = requestAnimationFrame(animate);
     };
