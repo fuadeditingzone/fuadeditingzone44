@@ -147,6 +147,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const initialY = typeof window !== 'undefined' ? window.innerHeight - 96 : 0;
     const { ref: draggableRef, position, handleMouseDown, handleTouchStart } = useDraggable({ x: initialX, y: initialY });
     const [hasAppeared, setHasAppeared] = useState(false);
+    
+    const botStatusRef = useRef(botStatus);
+    useEffect(() => { botStatusRef.current = botStatus; });
 
     useEffect(() => {
         let timer: number;
@@ -237,6 +240,12 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
         }
     }, []);
 
+    const addMessage = useCallback((text: string, sender: 'user' | 'bot', id?: string): ChatMessage => {
+        const newMessage: ChatMessage = { id: id || Date.now().toString(), text, sender };
+        setMessages(prev => [...prev, newMessage]);
+        return newMessage;
+    }, []);
+
     const speak = useCallback(async (text: string, messageId: string) => {
         if (!text.trim() || !aiRef.current || !modalityRef.current) return;
         setBotStatus('speaking');
@@ -256,6 +265,8 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             if (base64Audio && audioContextRef.current) {
                 const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
                 
+                // Add the message to the UI right before playing the audio to sync them.
+                addMessage(text, 'bot', messageId);
                 setSpokenMessage({ messageId, fullText: text, audioDuration: audioBuffer.duration });
                 
                 const source = audioContextRef.current.createBufferSource();
@@ -267,33 +278,23 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
                     setSpokenMessage(null);
                 };
             } else {
+                addMessage(text, 'bot', messageId);
                 setBotStatus('idle');
             }
         } catch (error) {
             console.error("TTS Error:", error);
+            addMessage(text, 'bot', messageId);
             setBotStatus('idle');
         }
-    }, []);
-
-    const addMessage = useCallback((text: string, sender: 'user' | 'bot', id?: string): ChatMessage => {
-        const newMessage: ChatMessage = { id: id || Date.now().toString(), text, sender };
-        setMessages(prev => [...prev, newMessage]);
-        return newMessage;
-    }, []);
-
+    }, [addMessage]);
+    
     const proactiveSpeakAndDisplay = useCallback((text: string) => {
-        // To prevent spamming multiple proactive messages (e.g., from fast scrolling),
-        // we only queue a new one if the bot is currently idle and the queue is empty.
-        if (botStatus !== 'idle' || proactiveMessageQueueRef.current.length > 0) {
+        // To prevent spamming, only queue a message if the bot is idle and the queue is empty.
+        if (botStatusRef.current !== 'idle' || proactiveMessageQueueRef.current.length > 0) {
             return;
         }
-        
-        // Add the message to the chat history UI
-        const newMessage = addMessage(text, 'bot');
-        // Add the message to the queue to be spoken
-        proactiveMessageQueueRef.current.push({ text, id: newMessage.id });
-    }, [addMessage, botStatus]);
-
+        proactiveMessageQueueRef.current.push({ text, id: Date.now().toString() });
+    }, []);
 
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -310,25 +311,21 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             for await (const chunk of stream) {
                 fullText += chunk.text;
             }
-
-            const newMessage = addMessage(fullText, 'bot');
-            await speak(fullText, newMessage.id);
+            await speak(fullText, Date.now().toString());
         } catch (error) {
             console.error("Gemini Error:", error);
             const errorText = "My apologies, something went wrong. Please try again in a moment. 🙏";
-            const newMessage = addMessage(errorText, 'bot');
-            await speak(errorText, newMessage.id);
+            await speak(errorText, Date.now().toString());
         }
     };
     
-    // Welcome Message
+    // Welcome Message - depends on a stable proactiveSpeakAndDisplay callback.
     useEffect(() => {
         if (!isReady || welcomeMessageSentRef.current) return;
         const welcomeTimer = setTimeout(() => {
             setHasAppeared(true);
             const hasVisited = localStorage.getItem('fuadAssistantVisited');
             let welcomeMessage;
-
             if (hasVisited) {
                 welcomeMessage = "Welcome back! It's wonderful to see you again. Let me know if there's anything I can help you with today. ✨";
             } else {
@@ -355,34 +352,25 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
                 explainedSections.current.add(sectionName);
                 proactiveSpeakAndDisplay(text);
             }
-        }, [isVisible, text, sectionName, proactiveSpeakAndDisplay, isReady, hasAppeared]);
+        }, [isVisible, text, sectionName, hasAppeared, isReady, proactiveSpeakAndDisplay]);
     };
 
     useSectionObserverHook(sectionRefs.portfolio, 'portfolio', "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨");
     useSectionObserverHook(sectionRefs.contact, 'contact', "Should you wish to collaborate or create something amazing together, this is the place. You can find all my social media links here or send an email directly. I look forward to hearing from you, Insha'Allah. 🤝");
     useSectionObserverHook(sectionRefs.about, 'about', "Here is a little bit about me. I am Fuad Ahmed, from Sylhet, Bangladesh. I began my journey in this field in 2020, and Alhamdulillah, I am passionate about every project I undertake. 😊");
     
-    // Process proactive message queue when audio is unlocked by user interaction
+    // Process proactive message queue
     useEffect(() => {
-        if (audioUnlocked && isReady) {
+        if (audioUnlocked && isReady && botStatus === 'idle' && proactiveMessageQueueRef.current.length > 0) {
             const speakNextInQueue = async () => {
-                if (proactiveMessageQueueRef.current.length === 0 || botStatus !== 'idle') {
-                    if (botStatus !== 'idle') {
-                        setTimeout(speakNextInQueue, 200);
-                    }
-                    return;
-                }
-
                 const message = proactiveMessageQueueRef.current.shift();
                 if (message) {
                     await speak(message.text, message.id);
-                    // Set a small delay before processing the next message
-                    setTimeout(speakNextInQueue, 200);
                 }
             };
             speakNextInQueue();
         }
-    }, [audioUnlocked, botStatus, speak, isReady]);
+    }, [audioUnlocked, isReady, botStatus, speak]);
     
     // Typing Sound Effect
     useEffect(() => {
@@ -504,7 +492,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
                             {messages.map(msg => (
                                <MessageItem key={msg.id} msg={msg} spokenMessage={spokenMessage} />
                             ))}
-                            {botStatus === 'thinking' && <ThinkingIndicator />}
+                            {(botStatus === 'thinking' || botStatus === 'speaking') && <ThinkingIndicator />}
                             <div ref={messagesEndRef} />
                         </div>
                         {/* Input */}
