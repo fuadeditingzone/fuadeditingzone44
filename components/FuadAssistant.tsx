@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { GoogleGenAI, Modality, Chat } from "@google/genai";
+// Note: Static import removed to prevent module-level errors.
+// import { GoogleGenAI, Modality, Chat } from "@google/genai";
 
 import type { ChatMessage } from '../types';
 import { PROFILE_PIC_URL } from '../constants';
@@ -126,8 +127,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
     // AI Initialization
-    const aiRef = useRef<GoogleGenAI | null>(null);
-    const chatRef = useRef<Chat | null>(null);
+    const aiRef = useRef<any | null>(null); // GoogleGenAI instance
+    const chatRef = useRef<any | null>(null); // Chat instance
+    const modalityRef = useRef<any | null>(null); // To store the Modality enum
     const [isReady, setIsReady] = useState(false);
     
     const proactiveMessageQueueRef = useRef<{text: string, id: string}[]>([]);
@@ -148,17 +150,23 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     }, [isChatOpen]);
 
     useEffect(() => {
-        try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) {
-                console.error("Fuad Assistant could not be initialized: API Key is missing.");
-                setIsReady(false);
-                return;
-            }
-            const genAI = new GoogleGenAI({ apiKey });
-            aiRef.current = genAI;
+        const initializeAI = async () => {
+            try {
+                const apiKey = process.env.API_KEY;
+                if (!apiKey) {
+                    console.warn("Fuad Assistant is offline: API Key is not configured.");
+                    setIsReady(false);
+                    return;
+                }
+                
+                // Dynamically import the library to avoid blocking the main thread on load
+                const { GoogleGenAI, Modality } = await import('@google/genai');
+                modalityRef.current = Modality; // Store for later use
+                
+                const genAI = new GoogleGenAI({ apiKey });
+                aiRef.current = genAI;
 
-            const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI with a natural, cinematic voice.
+                const systemInstruction = `You are 'Fuad Ahmed' — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
 
@@ -191,20 +199,23 @@ Auto-switch your speaking language based on user input (English, Bangla, Urdu wi
 - Avoid explicit, hateful, or religiously disrespectful words.
 
 Your goal is to be an adaptable guide: formal and professional at first, but ready to become a fun, cinematic, and friendly companion if the user sets that tone.`;
-            
-            chatRef.current = genAI.chats.create({
-                model: 'gemini-2.5-flash',
-                config: { systemInstruction },
-            });
-            setIsReady(true);
-        } catch (error) {
-            console.error("An unexpected error occurred while initializing Fuad Assistant's AI.", error);
-            setIsReady(false);
-        }
+                
+                chatRef.current = genAI.chats.create({
+                    model: 'gemini-2.5-flash',
+                    config: { systemInstruction },
+                });
+                setIsReady(true);
+            } catch (error) {
+                console.error("Failed to initialize Fuad Assistant's AI. The API key might be missing or invalid.", error);
+                setIsReady(false);
+            }
+        };
+
+        initializeAI();
     }, []);
 
     const speak = useCallback(async (text: string, messageId: string) => {
-        if (!text.trim() || !aiRef.current) return;
+        if (!text.trim() || !aiRef.current || !modalityRef.current) return;
         setBotStatus('speaking');
         try {
             if (!audioContextRef.current) {
@@ -214,7 +225,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
                 model: "gemini-2.5-flash-preview-tts",
                 contents: [{ parts: [{ text }] }],
                 config: {
-                    responseModalities: [Modality.AUDIO],
+                    responseModalities: [modalityRef.current.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
                 },
             });
