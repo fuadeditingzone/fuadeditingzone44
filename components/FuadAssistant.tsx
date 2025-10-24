@@ -67,6 +67,7 @@ interface FuadAssistantProps {
         about: React.RefObject<HTMLDivElement>;
     };
     audioUnlocked: boolean;
+    isProfileCardOpen: boolean;
 }
 
 interface SpokenMessage {
@@ -115,8 +116,12 @@ const ThinkingIndicator = React.memo(() => {
 });
 
 
-export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked }) => {
+export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked, isProfileCardOpen }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
+    
+    // The 'messages' state is managed by the FuadAssistant component, which persists
+    // throughout the user's session. This ensures that the chat history is retained
+    // even when the chat window is closed and reopened.
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [userInput, setUserInput] = useState('');
     const [botStatus, setBotStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
@@ -124,7 +129,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const [isWindowVisible, setWindowVisible] = useState(false);
 
     const audioContextRef = useRef<AudioContext | null>(null);
+    const typingAudioRef = useRef<HTMLAudioElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatWindowRef = useRef<HTMLDivElement>(null);
     
     // AI Initialization
     const aiRef = useRef<any | null>(null); // GoogleGenAI instance
@@ -211,7 +218,19 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             }
         };
 
+        const audio = new Audio('https://www.dropbox.com/scl/fi/f0hf1mcqk7cze184jx18o/typingphone-101683.mp3?rlkey=3x7soomaejec1vjfq980ixf31&dl=1');
+        audio.loop = true;
+        audio.volume = 0.4;
+        typingAudioRef.current = audio;
+
         initializeAI();
+
+        return () => {
+             if (typingAudioRef.current) {
+                typingAudioRef.current.pause();
+                typingAudioRef.current = null;
+            }
+        }
     }, []);
 
     const speak = useCallback(async (text: string, messageId: string) => {
@@ -259,9 +278,15 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
     }, []);
 
     const proactiveSpeakAndDisplay = useCallback((text: string) => {
+        const isAlreadyOpen = isChatOpen;
         const newMessage = addMessage(text, 'bot');
+        if (!isAlreadyOpen) {
+          // If the chat wasn't open, we add it to the history but don't show it until opened.
+          // This logic seems fine, but we can refine if needed.
+        }
         proactiveMessageQueueRef.current.push({ text, id: newMessage.id });
-    }, [addMessage]);
+    }, [addMessage, isChatOpen]);
+
 
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -310,7 +335,7 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
 
     // Section Explanations
     const explainedSections = useRef<Set<string>>(new Set());
-    const useSectionObserver = (ref: React.RefObject<HTMLDivElement>, sectionName: string, text: string) => {
+    const useSectionObserverHook = (ref: React.RefObject<HTMLDivElement>, sectionName: string, text: string) => {
         const [containerRef, isVisible] = useIntersectionObserver({ threshold: 0.5, triggerOnce: true });
         useEffect(() => {
             if (!ref.current) return;
@@ -325,9 +350,9 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
         }, [isVisible, text, sectionName, proactiveSpeakAndDisplay, isReady]);
     };
 
-    useSectionObserver(sectionRefs.portfolio, 'portfolio', "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨");
-    useSectionObserver(sectionRefs.contact, 'contact', "Should you wish to collaborate or create something amazing together, this is the place. You can find all my social media links here or send an email directly. I look forward to hearing from you, Insha'Allah. 🤝");
-    useSectionObserver(sectionRefs.about, 'about', "Here is a little bit about me. I am Fuad Ahmed, from Sylhet, Bangladesh. I began my journey in this field in 2020, and Alhamdulillah, I am passionate about every project I undertake. 😊");
+    useSectionObserverHook(sectionRefs.portfolio, 'portfolio', "You've arrived at the main gallery: my portfolio. Here you will find a collection of my work, from photo manipulations to cinematic VFX. Please, take your time to browse. 🎨");
+    useSectionObserverHook(sectionRefs.contact, 'contact', "Should you wish to collaborate or create something amazing together, this is the place. You can find all my social media links here or send an email directly. I look forward to hearing from you, Insha'Allah. 🤝");
+    useSectionObserverHook(sectionRefs.about, 'about', "Here is a little bit about me. I am Fuad Ahmed, from Sylhet, Bangladesh. I began my journey in this field in 2020, and Alhamdulillah, I am passionate about every project I undertake. 😊");
     
     // Process proactive message queue when audio is unlocked by user interaction
     useEffect(() => {
@@ -351,20 +376,61 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
         }
     }, [audioUnlocked, botStatus, speak, isReady]);
     
+    // Typing Sound Effect
+    useEffect(() => {
+        const typingAudio = typingAudioRef.current;
+        if (!typingAudio || !audioUnlocked) return;
+
+        if (botStatus === 'thinking' || botStatus === 'speaking') {
+            const playPromise = typingAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error("Typing sound playback failed:", error);
+                });
+            }
+        } else {
+            typingAudio.pause();
+            typingAudio.currentTime = 0;
+        }
+    }, [botStatus, audioUnlocked]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, botStatus]);
+
+    // Click outside to close chat
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!isChatOpen) return;
+
+            const target = event.target as Node;
+            const chatNode = chatWindowRef.current;
+            const buttonNode = draggableRef.current;
+            
+            if (chatNode && !chatNode.contains(target) && buttonNode && !buttonNode.contains(target)) {
+                setIsChatOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isChatOpen, draggableRef]);
     
     if (!isReady) {
         return null;
     }
+
+    const assistantZIndex = isProfileCardOpen ? 'z-[59]' : 'z-[75]';
+    const chatZIndex = isProfileCardOpen ? 'z-[59]' : 'z-[70]';
 
     return (
         <>
             <div
                 ref={draggableRef}
                 style={{ position: 'fixed', left: position.x, top: position.y, opacity: hasAppeared ? 1 : 0 }}
-                className={`z-[75] w-16 h-16 transition-opacity duration-500 ${!isChatOpen ? 'assistant-enter-animate' : ''}`}
+                className={`${assistantZIndex} w-16 h-16 transition-opacity duration-500 ${!isChatOpen ? 'assistant-enter-animate' : ''}`}
                 onMouseDown={handleMouseDown}
                 onTouchStart={handleTouchStart}
             >
@@ -379,8 +445,8 @@ Your goal is to be an adaptable guide: formal and professional at first, but rea
             </div>
             
             {isChatOpen && (
-                <div className="fixed inset-0 z-[70] flex items-end justify-center sm:justify-end p-4">
-                    <div className={`w-full max-w-md bg-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col h-[70vh] max-h-[600px] ${isWindowVisible ? 'chat-window-enter' : 'opacity-0'}`}>
+                <div ref={chatWindowRef} className={`fixed inset-0 ${chatZIndex} flex items-end justify-center sm:justify-end p-4 pointer-events-none`}>
+                    <div className={`w-full max-w-md bg-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col h-[70vh] max-h-[600px] pointer-events-auto ${isWindowVisible ? 'chat-window-enter' : 'opacity-0'}`}>
                         {/* Header */}
                         <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-white/10">
                             <div className="flex items-center gap-3">

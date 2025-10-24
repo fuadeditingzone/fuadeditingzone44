@@ -1,6 +1,5 @@
 
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem } from './types';
 import { GRAPHIC_WORKS } from './constants';
@@ -302,7 +301,7 @@ export default function App() {
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
       </div>
-      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} />
+      <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileCardOpen} />
     </div>
   );
 }
