@@ -70,8 +70,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [users]);
 
     const isEmailTaken = useCallback((email: string) => {
-        // FIX: Add explicit type annotation to the callback parameter to prevent type inference issues.
-        return Object.values(users).some((user: User) => user.email.toLowerCase() === email.toLowerCase());
+        // FIX: Add defensive check for user.email to prevent runtime errors with malformed data.
+        return Object.values(users).some((user: User) => user.email && user.email.toLowerCase() === email.toLowerCase());
     }, [users]);
 
     const register = useCallback((userData: User): User | null => {
@@ -89,8 +89,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [users, isUsernameTaken, isEmailTaken]);
 
     const login = useCallback((email: string): User | null => {
-        // FIX: Add explicit type annotation to the callback parameter to ensure 'u' is correctly typed as User.
-        const user = Object.values(users).find((u: User) => u.email.toLowerCase() === email.toLowerCase());
+        // FIX: Add defensive check for u.email to prevent runtime errors with malformed data.
+        const user = Object.values(users).find((u: User) => u.email && u.email.toLowerCase() === email.toLowerCase());
         if (user) {
             setCurrentUser(user);
             persistCurrentUser(user);
@@ -118,10 +118,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const findUsers = useCallback((query: string) => {
         if (!query) return [];
         const queryLower = query.toLowerCase();
-        // FIX: Add explicit type annotation to the callback parameter to fix type errors.
+        // FIX: Add defensive checks for user properties to prevent runtime errors.
         return Object.values(users).filter((user: User) => 
-            user.username.toLowerCase().includes(queryLower) ||
-            user.name.toLowerCase().includes(queryLower)
+            (user.username && user.username.toLowerCase().includes(queryLower)) ||
+            (user.name && user.name.toLowerCase().includes(queryLower))
         );
     }, [users]);
 

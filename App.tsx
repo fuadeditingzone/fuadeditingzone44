@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User } from './types';
+import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User, Post, Job } from './types';
 import { GRAPHIC_WORKS, PROFILE_CREATION_SOUND, BACKGROUND_MUSIC_TRACKS } from './constants';
 import { UserProvider, useUser } from './contexts/UserContext';
+import { MarketplaceProvider, useMarketplace } from './contexts/MarketplaceContext';
 
 import { CustomCursor } from './components/CustomCursor';
 import { StormyVFXBackground } from './components/StormyVFXBackground';
@@ -18,6 +19,12 @@ import { FuadAssistant } from './components/FuadAssistant';
 import { LoginModal } from './components/LoginModal';
 import { SearchResultsModal } from './components/SearchResultsModal';
 import { WelcomeScreen } from './components/WelcomeScreen';
+// New Marketplace Components
+import { ExploreModal } from './components/ExploreModal';
+import { JobsModal } from './components/JobsModal';
+import { UploadModal } from './components/UploadModal';
+import { PostJobModal } from './components/PostJobModal';
+import { JobDetailsModal } from './components/JobDetailsModal';
 
 const AUDIO_SOURCES = {
   background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
@@ -59,6 +66,15 @@ const AppContent = () => {
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
+  
+  // Marketplace Modal States
+  const [isExploreModalOpen, setIsExploreModalOpen] = useState(false);
+  const [isJobsModalOpen, setIsJobsModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPostJobModalOpen, setIsPostJobModalOpen] = useState(false);
+  const [viewingJob, setViewingJob] = useState<Job | null>(null);
+  const [viewingPost, setViewingPost] = useState<Post | null>(null);
+
 
   const sections = { home: useRef<HTMLDivElement>(null), portfolio: useRef<HTMLDivElement>(null), contact: useRef<HTMLDivElement>(null), about: useRef<HTMLDivElement>(null) };
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -76,7 +92,6 @@ const AppContent = () => {
   const movementIntensity = useRef(0);
   const movementTimeout = useRef<number | null>(null);
 
-  // Music Player Refs & State
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const profileSfxRef = useRef<HTMLAudioElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState(-1);
@@ -84,27 +99,19 @@ const AppContent = () => {
   const unlockAudio = useCallback(() => {
     if (audioUnlocked) return;
     console.log("Unlocking audio due to user interaction.");
-
     const backgroundAudio = audioRefs.current.background;
-    if (backgroundAudio) {
-        safePlay(backgroundAudio.play());
-    }
+    if (backgroundAudio) safePlay(backgroundAudio.play());
     setAudioUnlocked(true);
   }, [audioUnlocked]);
 
   const handleEnter = useCallback(() => {
-    if (audioUnlocked) {
-        safePlay(audioRefs.current.welcomeExit?.play());
-    }
+    if (audioUnlocked) safePlay(audioRefs.current.welcomeExit?.play());
     setAppState('entered');
   }, [audioUnlocked]);
 
   useEffect(() => {
     if (currentUser || isLocked || appState !== 'entered') return;
-    const timer = setTimeout(() => {
-      lockSite();
-      setIsLoginModalOpen(true);
-    }, 10 * 60 * 1000);
+    const timer = setTimeout(() => { lockSite(); setIsLoginModalOpen(true); }, 10 * 60 * 1000);
     return () => clearTimeout(timer);
   }, [currentUser, isLocked, lockSite, appState]);
   
@@ -116,10 +123,20 @@ const AppContent = () => {
 
   const viewProfile = useCallback((user: User) => {
       setViewingUser(user);
-      setIsSearchResultsModalOpen(false); // if it was opened from search
+      setIsSearchResultsModalOpen(false);
       setIsProfileModalOpen(true);
       window.history.pushState({}, '', `/${user.username}`);
   }, []);
+  
+  const viewProfileByUsername = useCallback((username: string) => {
+    const user = getUserByUsername(username);
+    if (user) {
+        setIsExploreModalOpen(false);
+        setIsJobsModalOpen(false);
+        if(viewingJob) setViewingJob(null);
+        viewProfile(user);
+    }
+  }, [getUserByUsername, viewProfile, viewingJob]);
 
   useEffect(() => {
     const path = window.location.pathname;
@@ -154,13 +171,8 @@ const AppContent = () => {
 
   useEffect(() => { 
     Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); 
-    const musicAudio = new Audio();
-    musicAudio.loop = true;
-    musicAudioRef.current = musicAudio;
-    
-    const sfxAudio = new Audio(PROFILE_CREATION_SOUND);
-    sfxAudio.volume = 0.7;
-    profileSfxRef.current = sfxAudio;
+    const musicAudio = new Audio(); musicAudio.loop = true; musicAudioRef.current = musicAudio;
+    const sfxAudio = new Audio(PROFILE_CREATION_SOUND); sfxAudio.volume = 0.7; profileSfxRef.current = sfxAudio;
   }, []);
   
   useEffect(() => {
@@ -179,66 +191,29 @@ const AppContent = () => {
     return () => document.removeEventListener('mouseover', handleMouseOver);
   }, [audioUnlocked]);
   
-    const handleMovement = useCallback((clientX: number, clientY: number) => {
-        const now = Date.now();
-        const timeDelta = now - lastMousePosition.current.time;
-
-        if (timeDelta < 10) return;
-
-        const distance = Math.sqrt(Math.pow(clientX - lastMousePosition.current.x, 2) + Math.pow(clientY - lastMousePosition.current.y, 2));
-        const speed = distance / timeDelta;
-
-        lastMousePosition.current = { x: clientX, y: clientY, time: now };
-
-        if (speed > 8) {
-            movementIntensity.current += 1;
-        }
-
-        if (movementTimeout.current) clearTimeout(movementTimeout.current);
-        movementTimeout.current = window.setTimeout(() => {
-            movementIntensity.current = Math.max(0, movementIntensity.current - 2);
-        }, 500);
-
-        if (movementIntensity.current > 20) {
-            setExcessiveMovement(c => c + 1);
-            movementIntensity.current = 0;
-        }
-    }, []);
+  const handleMovement = useCallback((clientX: number, clientY: number) => {
+      const now = Date.now(); const timeDelta = now - lastMousePosition.current.time; if (timeDelta < 10) return;
+      const distance = Math.sqrt(Math.pow(clientX - lastMousePosition.current.x, 2) + Math.pow(clientY - lastMousePosition.current.y, 2));
+      const speed = distance / timeDelta; lastMousePosition.current = { x: clientX, y: clientY, time: now };
+      if (speed > 8) { movementIntensity.current += 1; }
+      if (movementTimeout.current) clearTimeout(movementTimeout.current);
+      movementTimeout.current = window.setTimeout(() => { movementIntensity.current = Math.max(0, movementIntensity.current - 2); }, 500);
+      if (movementIntensity.current > 20) { setExcessiveMovement(c => c + 1); movementIntensity.current = 0; }
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
         handleMovement(e.clientX, e.clientY);
-        
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (!audioUnlocked || !ctx) return;
-        
-        const now = Date.now();
-        const timeDelta = now - lastMousePosition.current.time;
-
+        const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!audioUnlocked || !ctx) return;
+        const now = Date.now(); const timeDelta = now - lastMousePosition.current.time;
         if (timeDelta > 20) {
             const distance = Math.sqrt(Math.pow(e.clientX - lastMousePosition.current.x, 2) + Math.pow(e.clientY - lastMousePosition.current.y, 2));
             const speed = distance / timeDelta;
-            
-            if (speed > 5) {
-                ctx.beginPath();
-                ctx.moveTo(lastMousePosition.current.x, lastMousePosition.current.y);
-                ctx.lineTo(e.clientX, e.clientY);
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = Math.min(8, 2 + speed / 3); 
-                ctx.lineCap = 'round';
-                ctx.shadowColor = '#e50914';
-                ctx.shadowBlur = 25;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
-
+            if (speed > 5) { ctx.beginPath(); ctx.moveTo(lastMousePosition.current.x, lastMousePosition.current.y); ctx.lineTo(e.clientX, e.clientY); ctx.strokeStyle = 'white'; ctx.lineWidth = Math.min(8, 2 + speed / 3); ctx.lineCap = 'round'; ctx.shadowColor = '#e50914'; ctx.shadowBlur = 25; ctx.stroke(); ctx.shadowBlur = 0; }
             if (speed > 3 && !isStormSoundPlaying.current) {
                 const stormAudio = audioRefs.current.storm;
                 if (stormAudio) {
-                    isStormSoundPlaying.current = true;
-                    stormAudio.currentTime = 0; stormAudio.volume = AUDIO_SOURCES.storm.volume;
-                    safePlay(stormAudio.play());
+                    isStormSoundPlaying.current = true; stormAudio.currentTime = 0; stormAudio.volume = AUDIO_SOURCES.storm.volume; safePlay(stormAudio.play());
                     setTimeout(() => {
                         if (stormSoundFadeInterval.current) clearInterval(stormSoundFadeInterval.current);
                         const fadeDuration = 1000; const fadeSteps = 20; const volumeStep = AUDIO_SOURCES.storm.volume / fadeSteps;
@@ -250,58 +225,23 @@ const AppContent = () => {
                 }
             }
         }
-        if (canPlayMoveSound.current) {
-            safePlay(audioRefs.current.mouseMove?.play());
-            canPlayMoveSound.current = false;
-            setTimeout(() => { canPlayMoveSound.current = true; }, 150);
-        }
+        if (canPlayMoveSound.current) { safePlay(audioRefs.current.mouseMove?.play()); canPlayMoveSound.current = false; setTimeout(() => { canPlayMoveSound.current = true; }, 150); }
     };
-    
-    const handleTouchMove = (e: TouchEvent) => {
-        if (e.touches.length > 0) {
-            handleMovement(e.touches[0].clientX, e.touches[0].clientY);
-        }
-    };
-    
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('touchmove', handleTouchMove);
-    return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('touchmove', handleTouchMove);
-    };
+    const handleTouchMove = (e: TouchEvent) => { if (e.touches.length > 0) handleMovement(e.touches[0].clientX, e.touches[0].clientY); };
+    window.addEventListener('mousemove', handleMouseMove); window.addEventListener('touchmove', handleTouchMove);
+    return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('touchmove', handleTouchMove); };
   }, [handleMovement, audioUnlocked]);
   
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+    const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return;
     const setCanvasSize = () => {
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = window.innerWidth * dpr;
-        canvas.height = window.innerHeight * dpr;
-        canvas.style.width = `${window.innerWidth}px`;
-        canvas.style.height = `${window.innerHeight}px`;
-        ctx.scale(dpr, dpr);
+        const dpr = window.devicePixelRatio || 1; canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
+        canvas.style.width = `${window.innerWidth}px`; canvas.style.height = `${window.innerHeight}px`; ctx.scale(dpr, dpr);
     };
-
-    setCanvasSize();
-    window.addEventListener('resize', setCanvasSize);
-
-    let animationFrameId: number;
-    const animate = () => {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-        ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-        animationFrameId = requestAnimationFrame(animate);
-    };
-    animate();
-
-    return () => {
-        window.removeEventListener('resize', setCanvasSize);
-        cancelAnimationFrame(animationFrameId);
-    };
-}, []);
+    setCanvasSize(); window.addEventListener('resize', setCanvasSize);
+    let animationFrameId: number; const animate = () => { ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight); animationFrameId = requestAnimationFrame(animate); };
+    animate(); return () => { window.removeEventListener('resize', setCanvasSize); cancelAnimationFrame(animationFrameId); };
+  }, []);
   
   const [modalState, setModalState] = useState<{ items: ModalItem[]; currentIndex: number } | null>(null);
   const [orderModalState, setOrderModalState] = useState<{ isOpen: boolean; mode: 'whatsapp' | 'email' } | null>(null);
@@ -316,57 +256,35 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isLoginModalOpen, isSearchResultsModalOpen, isProfileModalOpen]);
+  const anyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen || isExploreModalOpen || isJobsModalOpen || isUploadModalOpen || isPostJobModalOpen || !!viewingJob;
+  useEffect(() => { document.body.style.overflow = anyModalOpen ? 'hidden' : 'auto'; }, [anyModalOpen]);
   
   useEffect(() => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
-    const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying;
-    const shouldMute = isAnyVideoPlaying || currentTrack > -1;
+    const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying; const shouldMute = isAnyVideoPlaying || currentTrack > -1;
     const backgroundAudio = audioRefs.current.background;
-    if (backgroundAudio && audioUnlocked) {
-      backgroundAudio.volume = shouldMute ? 0 : AUDIO_SOURCES.background.volume;
-    }
+    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = shouldMute ? 0 : AUDIO_SOURCES.background.volume;
   }, [modalState, isVfxVideoPlaying, currentTrack, audioUnlocked]);
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
-    if (!audioUnlocked) {
-        unlockAudio();
-    } else {
-        safePlay(audioRefs.current.click?.play());
-    }
-
-    const target = e.target as HTMLElement;
-    const isInteractive = target.closest('a, button');
+    if (!audioUnlocked) unlockAudio(); else safePlay(audioRefs.current.click?.play());
+    const target = e.target as HTMLElement; const isInteractive = target.closest('a, button');
     const isTextElement = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'].includes(target.tagName) || (target.tagName === 'SPAN' && target.childElementCount === 0);
     if (e.type === 'click' && 'button' in e && e.button !== 0) return;
-    if (isTextElement && !isInteractive) {
-        target.classList.add('animate-text-bounce');
-        setTimeout(() => target.classList.remove('animate-text-bounce'), 300);
-    }
+    if (isTextElement && !isInteractive) { target.classList.add('animate-text-bounce'); setTimeout(() => target.classList.remove('animate-text-bounce'), 300); }
   }, [audioUnlocked, unlockAudio]);
   
   const handleContextMenu = (e: React.MouseEvent) => {
-      e.preventDefault();
-      if ((e.target as HTMLElement).closest('a, button, iframe, input, textarea, [role="dialog"]')) return;
+      e.preventDefault(); if ((e.target as HTMLElement).closest('a, button, iframe, input, textarea, [role="dialog"]')) return;
       setContextMenu({ x: e.clientX, y: e.clientY });
   };
   
   const handleQuickActionClick = (service: Service) => {
-      setContextMenu(null);
-      if (!sections.portfolio.current) return;
-      sections.portfolio.current.scrollIntoView({ behavior: 'smooth' });
+      setContextMenu(null); if (!sections.portfolio.current) return; sections.portfolio.current.scrollIntoView({ behavior: 'smooth' });
       let targetId = '';
-      if (service.name === 'VFX') {
-          setActivePortfolioTab('vfx');
-          setActiveVfxSubTab('vfxEdits');
-          targetId = 'vfx-category-Cinematic-VFX';
-      } else if (service.name.includes('Photo')) {
-          setActivePortfolioTab('graphic');
-          targetId = 'graphic-category-Photo Manipulation';
-      } else if (service.name.includes('Thumbnails')) {
-          setActivePortfolioTab('graphic');
-          targetId = 'graphic-category-YouTube Thumbnails';
-      }
+      if (service.name === 'VFX') { setActivePortfolioTab('vfx'); setActiveVfxSubTab('vfxEdits'); targetId = 'vfx-category-Cinematic-VFX'; } 
+      else if (service.name.includes('Photo')) { setActivePortfolioTab('graphic'); targetId = 'graphic-category-Photo Manipulation'; } 
+      else if (service.name.includes('Thumbnails')) { setActivePortfolioTab('graphic'); targetId = 'graphic-category-YouTube Thumbnails'; }
       setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 700);
   };
   
@@ -374,45 +292,22 @@ const AppContent = () => {
   const openSingleImageViewer = (startIndex: number) => { setSingleImageViewerState({ items: GRAPHIC_WORKS, currentIndex: startIndex }); setIsGalleryGridOpen(false); };
   const openOrderModal = useCallback((mode: 'whatsapp' | 'email') => setOrderModalState({ isOpen: true, mode }), []);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (contextMenu) setContextMenu(null);
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [contextMenu]);
+  useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (contextMenu) setContextMenu(null); }; document.addEventListener('click', handleClickOutside); return () => document.removeEventListener('click', handleClickOutside); }, [contextMenu]);
   
   const handleRegisterSuccess = useCallback((newUser: User) => {
-    if (profileSfxRef.current && audioUnlocked) {
-      profileSfxRef.current.currentTime = 0;
-      safePlay(profileSfxRef.current.play());
-    }
+    if (profileSfxRef.current && audioUnlocked) { profileSfxRef.current.currentTime = 0; safePlay(profileSfxRef.current.play()); }
     setNewlyRegisteredUser(newUser);
   }, [audioUnlocked]);
 
-  // --- Music Player Controls ---
   const playMusic = useCallback((trackIndex: number) => {
-    const musicAudio = musicAudioRef.current;
-    if (!musicAudio || !BACKGROUND_MUSIC_TRACKS[trackIndex] || !audioUnlocked) return false;
-    musicAudio.src = BACKGROUND_MUSIC_TRACKS[trackIndex].url;
-    safePlay(musicAudio.play());
-    setCurrentTrack(trackIndex);
-    return true;
+    const musicAudio = musicAudioRef.current; if (!musicAudio || !BACKGROUND_MUSIC_TRACKS[trackIndex] || !audioUnlocked) return false;
+    musicAudio.src = BACKGROUND_MUSIC_TRACKS[trackIndex].url; safePlay(musicAudio.play()); setCurrentTrack(trackIndex); return true;
   }, [audioUnlocked]);
-
-  const pauseMusic = useCallback(() => {
-    musicAudioRef.current?.pause();
-    setCurrentTrack(-1);
-    return true;
-  }, []);
-
+  const pauseMusic = useCallback(() => { musicAudioRef.current?.pause(); setCurrentTrack(-1); return true; }, []);
   const setVolume = useCallback((volume: number) => {
-    const newVolume = Math.max(0, Math.min(1, volume / 100));
-    const backgroundAudio = audioRefs.current.background;
+    const newVolume = Math.max(0, Math.min(1, volume / 100)); const backgroundAudio = audioRefs.current.background;
     const musicAudio = musicAudioRef.current;
-    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = newVolume * 0.3; // Keep ambient lower
-    if (musicAudio) musicAudio.volume = newVolume;
-    return true;
+    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = newVolume * 0.3; if (musicAudio) musicAudio.volume = newVolume; return true;
   }, [audioUnlocked]);
 
   return (
@@ -428,11 +323,8 @@ const AppContent = () => {
         <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
         
         <Header 
-            onScrollTo={scrollToSection} 
-            onLoginClick={() => setIsLoginModalOpen(true)}
-            onViewProfile={viewProfile}
-            onSearch={handleSearch}
-            isReflecting={isReflecting} 
+            onScrollTo={scrollToSection} onLoginClick={() => setIsLoginModalOpen(true)} onViewProfile={viewProfile} onSearch={handleSearch} isReflecting={isReflecting} 
+            onUploadClick={() => setIsUploadModalOpen(true)} onPostJobClick={() => setIsPostJobModalOpen(true)} onExploreClick={() => setIsExploreModalOpen(true)} onJobsClick={() => setIsJobsModalOpen(true)}
         />
         <main>
           <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
@@ -449,26 +341,19 @@ const AppContent = () => {
         {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
         
         {appState === 'entered' && (
-          <FuadAssistant 
-            sectionRefs={sections} 
-            audioUnlocked={audioUnlocked} 
-            isProfileCardOpen={isProfileModalOpen} 
-            onExcessiveMovement={excessiveMovement} 
-            user={currentUser} 
-            isLocked={isLocked} 
-            setIsParallaxActive={setIsParallaxActive}
-            newlyRegisteredUser={newlyRegisteredUser}
-            onNewUserHandled={() => setNewlyRegisteredUser(null)}
-            playMusic={playMusic}
-            pauseMusic={pauseMusic}
-            setVolume={setVolume}
-          />
+          <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileModalOpen} onExcessiveMovement={excessiveMovement} user={currentUser} isLocked={isLocked} setIsParallaxActive={setIsParallaxActive} newlyRegisteredUser={newlyRegisteredUser} onNewUserHandled={() => setNewlyRegisteredUser(null)} playMusic={playMusic} pauseMusic={pauseMusic} setVolume={setVolume} />
         )}
       </div>
 
       {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={handleProfileModalClose} />}
       {isLoginModalOpen && <LoginModal onClose={handleLoginModalClose} onRegisterSuccess={handleRegisterSuccess} />}
       {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
+
+      {isExploreModalOpen && <ExploreModal onClose={() => setIsExploreModalOpen(false)} onViewPost={setViewingPost} onViewProfile={viewProfileByUsername} />}
+      {isJobsModalOpen && <JobsModal onClose={() => setIsJobsModalOpen(false)} onViewJob={setViewingJob} onPostJobClick={() => { setIsJobsModalOpen(false); setIsPostJobModalOpen(true); }} />}
+      {isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
+      {isPostJobModalOpen && <PostJobModal onClose={() => setIsPostJobModalOpen(false)} />}
+      {viewingJob && <JobDetailsModal job={viewingJob} onClose={() => setViewingJob(null)} onViewProfile={viewProfileByUsername} />}
 
       {isLocked && !isLoginModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
@@ -480,7 +365,9 @@ const AppContent = () => {
 export default function App() {
     return (
         <UserProvider>
-            <AppContent />
+            <MarketplaceProvider>
+                <AppContent />
+            </MarketplaceProvider>
         </UserProvider>
     );
 }

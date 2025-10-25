@@ -56,3 +56,45 @@ export interface User {
   instagramUrl?: string;
   behanceUrl?: string;
 }
+
+// --- Marketplace Types ---
+
+export interface Post {
+  id: string;
+  authorUsername: string;
+  authorName: string;
+  authorAvatarUrl?: string;
+  type: 'image' | 'video';
+  mediaUrl: string; // for images, base64 data url. for videos, a direct link.
+  thumbnailUrl?: string; // For videos
+  title: string;
+  description?: string;
+  tags: string[];
+  views: number;
+  createdAt: number; // timestamp
+}
+
+export interface Job {
+  id: string;
+  clientUsername: string;
+  clientName: string;
+  clientAvatarUrl?: string;
+  title: string;
+  description: string;
+  budget: number;
+  currency: string;
+  deadline: string; // e.g., '1 week', '2 weeks'
+  createdAt: number; // timestamp
+  status: 'open' | 'in-progress' | 'closed';
+  hiredDesignerUsername?: string;
+}
+
+export interface Submission {
+  id: string;
+  jobId: string;
+  designerUsername: string;
+  designerName:string;
+  designerAvatarUrl?: string;
+  post: Post; // The full post object is submitted
+  submittedAt: number; // timestamp
+}

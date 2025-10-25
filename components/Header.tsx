@@ -3,6 +3,7 @@ import { LOGO_URL } from '../constants';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { ProfileMenu } from './ProfileMenu';
+import { UploadIcon, BriefcaseIcon } from './Icons';
 
 interface HeaderProps {
   onScrollTo: (section: 'home' | 'portfolio' | 'contact' | 'about') => void;
@@ -10,9 +11,14 @@ interface HeaderProps {
   onViewProfile: (user: User) => void;
   onSearch: (query: string) => void;
   isReflecting: boolean;
+  onUploadClick: () => void;
+  onPostJobClick: () => void;
+  onExploreClick: () => void;
+  onJobsClick: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onViewProfile, onSearch, isReflecting }) => {
+export const Header: React.FC<HeaderProps> = (props) => {
+  const { onScrollTo, onLoginClick, onViewProfile, onSearch, isReflecting, onUploadClick, onPostJobClick, onExploreClick, onJobsClick } = props;
   const { currentUser, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -59,10 +65,10 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
     }
   };
 
-  const NavLink: React.FC<{ section: 'home' | 'portfolio' | 'contact' | 'about', children: React.ReactNode }> = ({ section, children }) => (
+  const NavLink: React.FC<{ onClick: () => void, children: React.ReactNode }> = ({ onClick, children }) => (
     <button
       onClick={() => {
-          onScrollTo(section);
+          onClick();
           setIsMenuOpen(false);
       }}
       className="text-3d text-gray-300 hover:text-white transition-all duration-300 text-lg relative after:content-[''] after:absolute after:left-0 after:bottom-[-4px] after:w-0 after:h-[2px] after:bg-[#e50914] after:transition-all after:duration-300 hover:after:w-full"
@@ -85,10 +91,10 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
         </button>
         <div className="flex items-center">
             <div className="hidden md:flex items-center space-x-8">
-              <NavLink section="home">Home</NavLink>
-              <NavLink section="portfolio">Portfolio</NavLink>
-              <NavLink section="about">About</NavLink>
-              <NavLink section="contact">Contact</NavLink>
+              <NavLink onClick={onExploreClick}>Explore</NavLink>
+              <NavLink onClick={onJobsClick}>Jobs</NavLink>
+              <NavLink onClick={() => onScrollTo('portfolio')}>Portfolio</NavLink>
+              <NavLink onClick={() => onScrollTo('about')}>About</NavLink>
             </div>
             
             <div className="flex items-center gap-4 ml-4">
@@ -110,6 +116,19 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
                   </form>
                 )}
               </div>
+              
+              {currentUser?.role === 'designer' && (
+                <button onClick={onUploadClick} className="hidden md:flex items-center gap-2 bg-gray-800/50 text-gray-200 font-semibold py-2 px-4 rounded-full transition-all duration-300 hover:bg-red-600 hover:text-white transform hover:scale-105 btn-glow">
+                  <UploadIcon className="w-5 h-5" />
+                  Upload
+                </button>
+              )}
+              {currentUser?.role === 'client' && (
+                <button onClick={onPostJobClick} className="hidden md:flex items-center gap-2 bg-gray-800/50 text-gray-200 font-semibold py-2 px-4 rounded-full transition-all duration-300 hover:bg-red-600 hover:text-white transform hover:scale-105 btn-glow">
+                  <BriefcaseIcon className="w-5 h-5" />
+                  Post a Job
+                </button>
+              )}
 
               <div className="relative">
                 {currentUser ? (
@@ -148,10 +167,10 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
       </nav>
       {isMenuOpen && (
           <div className="md:hidden bg-black/95 backdrop-blur-sm flex flex-col items-center space-y-6 py-8">
-            <NavLink section="home">Home</NavLink>
-            <NavLink section="portfolio">Portfolio</NavLink>
-            <NavLink section="about">About</NavLink>
-            <NavLink section="contact">Contact</NavLink>
+            <NavLink onClick={onExploreClick}>Explore</NavLink>
+            <NavLink onClick={onJobsClick}>Jobs</NavLink>
+            <NavLink onClick={() => onScrollTo('portfolio')}>Portfolio</NavLink>
+            <NavLink onClick={() => onScrollTo('about')}>About</NavLink>
             {!currentUser && (
               <button onClick={() => { onLoginClick(); setIsMenuOpen(false); }} className="text-gray-300 hover:text-white transition-colors duration-300 text-lg">Login</button>
             )}

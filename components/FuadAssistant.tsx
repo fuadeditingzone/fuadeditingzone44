@@ -137,7 +137,6 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const lastUserActivityRef = useRef<number>(Date.now());
     const movementReactionCooldownRef = useRef(0);
     
-    // Fix: Provide an explicit initial value to useRef to address the "Expected 1 arguments, but got 0" error.
     const processStoryQueueRef = useRef<(() => Promise<void>) | null>(null);
     
     const initialX = typeof window !== 'undefined' ? window.innerWidth / 2 - 32 : 0;
@@ -412,23 +411,31 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
                 source.onended = () => { if (currentAudioSourceRef.current === source) { currentAudioSourceRef.current = null; if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); } };
             } else { addBotMessage(text, { id: messageId, component }); if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); }
         } catch (error) {
+            // FIX: Implement robust API key rotation for TTS. Try all available keys before falling back to text-only mode on rate limit errors.
             console.error("TTS Error:", error);
-            if (error instanceof ApiError && error.message.includes('RESOURCE_EXHAUSTED')) {
+            const isResourceExhausted = error instanceof ApiError && error.message.includes('RESOURCE_EXHAUSTED');
+
+            if (retryAttempt < API_KEYS.length - 1) {
+                apiKeyIndexRef.current++;
+                if (initializeAI(apiKeyIndexRef.current)) {
+                    console.log(`TTS Error, switching to API key index ${apiKeyIndexRef.current}`);
+                    setTimeout(() => speak(text, messageId, component, retryAttempt + 1, isStoryPart), 1000);
+                    return;
+                }
+            }
+
+            // If all keys have been tried and failed
+            if (isResourceExhausted) {
                 switchToTextOnlyMode();
-                addBotMessage(text, { id: messageId, component });
-                if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle');
-                return;
             }
-            if (retryAttempt < API_KEYS.length - 1) { 
-                apiKeyIndexRef.current++; 
-                if (initializeAI(apiKeyIndexRef.current)) { 
-                    setTimeout(() => speak(text, messageId, component, retryAttempt + 1, isStoryPart), 1000); 
-                    return; 
-                } 
-            }
-            switchToTextOnlyMode();
+
+            // Fallback to displaying the message as text if TTS fails completely
             addBotMessage(text, { id: messageId, component });
-            if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle');
+            if (isStoryPart) {
+                processStoryQueueRef.current?.();
+            } else {
+                setBotStatus('idle');
+            }
         }
     }, [addBotMessage, stopCurrentSpeech, isVoiceDisabled, initializeAI, switchToTextOnlyMode]);
     
@@ -446,12 +453,18 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
 
     useEffect(() => { processStoryQueueRef.current = processStoryQueue; }, [processStoryQueue]);
 
-    const handleSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault(); const currentInput = userInput.trim(); const chat = chatRef.current; if (!currentInput || botStatus !== 'idle' || !chat) return;
-        
-        addMessage(currentInput, 'user'); setUserInput('');
-        stopCurrentSpeech(true);
-        setBotStatus('thinking');
+    // FIX: Refactor handleSubmit to support recursive retries with different API keys on failure.
+    const handleSubmit = async (e?: React.FormEvent, textInput?: string, retryAttempt = 0) => {
+        e?.preventDefault();
+        const currentInput = textInput ?? userInput.trim();
+        if (!currentInput || (botStatus !== 'idle' && !textInput) || !chatRef.current) return;
+
+        if (!textInput) { // only on first attempt
+            addMessage(currentInput, 'user');
+            setUserInput('');
+            stopCurrentSpeech(true);
+            setBotStatus('thinking');
+        }
 
         if (isVoiceDisabled) {
             setTimeout(() => {
@@ -467,7 +480,7 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
         }
         
         try {
-            let response = await chat.sendMessage({ message: currentInput });
+            let response = await chatRef.current.sendMessage({ message: currentInput });
             while (response.functionCalls && response.functionCalls.length > 0) {
                 const call = response.functionCalls[0]; const { name, args } = call; let result, success = false;
                 if (name === 'playMusic' && args.trackIndex !== undefined) { success = playMusic(args.trackIndex as number); result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." }; }
@@ -475,7 +488,7 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
                 else if (name === 'setVolume' && args.volume !== undefined) { success = setVolume(args.volume as number); result = { success, detail: `Volume set to ${args.volume}` }; }
                 
                 const functionResponse: Part[] = [{ functionResponse: { name, response: { result } } }];
-                response = await chat.sendMessage({ message: functionResponse });
+                response = await chatRef.current.sendMessage({ message: functionResponse });
             }
 
             const fullText = response.text;
@@ -487,7 +500,17 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
             if (messageParts.length > 1) { storyQueueRef.current = messageParts; await processStoryQueue(); } 
             else { await speak(fullText, Date.now().toString()); }
         } catch (error) {
-            console.error("Gemini Error:", error);
+            console.error(`Gemini Error (attempt ${retryAttempt + 1}):`, error);
+            
+            if (retryAttempt < API_KEYS.length - 1) {
+                apiKeyIndexRef.current++;
+                if (initializeAI(apiKeyIndexRef.current)) {
+                    console.log(`Gemini chat Error, switching to API key index ${apiKeyIndexRef.current}`);
+                    await handleSubmit(undefined, currentInput, retryAttempt + 1);
+                    return; // exit after recursive call
+                }
+            }
+            
             if (error instanceof ApiError && error.message.includes('RESOURCE_EXHAUSTED')) {
                 switchToTextOnlyMode();
             } else {
