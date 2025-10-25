@@ -70,10 +70,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
+        // If a full user profile already exists, close the modal.
+        if (currentUser) {
+            onClose();
+            return;
+        }
+
+        // If the user is authenticated via Firebase but doesn't have a profile in our app yet.
         if (firebaseUser && !currentUser) {
-            setFormData(prev => ({ ...prev, name: firebaseUser.displayName || '' }));
-            if (firebaseUser.photoURL) {
-                // Fetch the image and create a File object to be uploaded to our own storage
+            // This effect can run multiple times in React's StrictMode.
+            // To prevent resetting user input, we only pre-fill the form if the name is not already set.
+            setFormData(prev => ({
+                ...prev,
+                name: prev.name || firebaseUser.displayName || '',
+            }));
+
+            // Similarly, only fetch the avatar if we haven't already fetched it or the user hasn't picked one.
+            if (firebaseUser.photoURL && !avatarFile && !avatarPreview) {
                 fetch(firebaseUser.photoURL)
                     .then(res => res.blob())
                     .then(blob => {
@@ -83,11 +96,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                     })
                     .catch(console.error);
             }
+            // Move the user to the profile creation step.
             setStep('creating_profile');
-        } else if (currentUser) {
-            onClose();
         }
-    }, [firebaseUser, currentUser, onClose]);
+    }, [firebaseUser, currentUser, onClose, avatarFile, avatarPreview]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
