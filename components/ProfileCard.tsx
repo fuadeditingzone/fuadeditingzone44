@@ -34,9 +34,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => 
                     </button>
                     
                     <div className="relative w-28 h-28 mx-auto">
-                        <div className="w-full h-full rounded-full bg-red-600 flex items-center justify-center border-4 border-gray-700 glow-shadow">
-                           <span className="text-5xl font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
-                        </div>
+                        {/* FIX: Display user's profile picture */}
+                        <img src={user.photoURL} alt={user.name} className="w-full h-full object-cover rounded-full border-4 border-gray-700 glow-shadow" />
                     </div>
 
                     <h2 className="text-3xl font-bold mt-4 text-white">{user.name}</h2>

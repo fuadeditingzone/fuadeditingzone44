@@ -18,6 +18,7 @@ import { FuadAssistant } from './components/FuadAssistant';
 import { LoginModal } from './components/LoginModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import { LoginWallModal } from './components/LoginWallModal';
 
 const AUDIO_SOURCES = {
   background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
@@ -45,7 +46,7 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
 type AppState = 'welcome' | 'entering' | 'entered';
 
 const AppContent = () => {
-  const { currentUser, isProfileCreationRequired } = useUser();
+  const { currentUser, isAuthLoading, isProfileCreationRequired } = useUser();
   const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [excessiveMovement, setExcessiveMovement] = useState(0);
@@ -54,6 +55,7 @@ const AppContent = () => {
   // Modal States
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isLoginWallVisible, setIsLoginWallVisible] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
 
@@ -78,6 +80,22 @@ const AppContent = () => {
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const profileSfxRef = useRef<HTMLAudioElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState(-1);
+
+  useEffect(() => {
+    // 10-minute timer for guests
+    if (!currentUser && !isAuthLoading && appState === 'entered') {
+      const timer = setTimeout(() => {
+        if (!isLoginWallVisible && !isProfileCreationRequired) {
+          setIsLoginWallVisible(true);
+        }
+      }, 10 * 60 * 1000); // 10 minutes
+
+      return () => clearTimeout(timer);
+    } else if (currentUser) {
+      // Hide the wall if the user logs in
+      setIsLoginWallVisible(false);
+    }
+  }, [currentUser, isAuthLoading, appState, isLoginWallVisible, isProfileCreationRequired]);
 
   const startBackgroundAudio = useCallback(() => {
     if (audioContextStarted.current) return;
@@ -289,7 +307,7 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isProfileCreationRequired || isProfileModalOpen || isEditProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isProfileCreationRequired, isProfileModalOpen, isEditProfileModalOpen]);
+  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isProfileCreationRequired || isProfileModalOpen || isEditProfileModalOpen || isLoginWallVisible; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isProfileCreationRequired, isProfileModalOpen, isEditProfileModalOpen, isLoginWallVisible]);
   
   useEffect(() => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
@@ -385,14 +403,16 @@ const AppContent = () => {
     return true;
   }, []);
 
+  const isAnyOverlayActive = isProfileCreationRequired || isLoginWallVisible;
+
   return (
     <div className={`root-container state-${appState}`}>
       <StormyVFXBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} appState={appState} />
       <WelcomeScreen onEnter={handleEnter} />
       
-      <div className={`app-content text-white relative isolate transition-all duration-500 ${isProfileCreationRequired ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+      <div className={`app-content text-white relative isolate transition-all duration-500 ${isAnyOverlayActive ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
-        <CustomCursor isVisible={!isProfileCreationRequired} />
+        <CustomCursor isVisible={!isAnyOverlayActive} />
         
         <Header 
             onScrollTo={scrollToSection} 
@@ -412,7 +432,7 @@ const AppContent = () => {
         {singleImageViewerState && <ModalViewer state={singleImageViewerState} onClose={() => setSingleImageViewerState(null)} onNext={showNextInSingleImageViewer} onPrev={showPrevInSingleImageViewer} />}
         {isServicesPopupOpen && <ServicesPopup onClose={() => setIsServicesPopupOpen(false)} />}
         {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
-        {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
+        {contextMenu && <ContextMenu x={contextMenu.y} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
         
         {appState === 'entered' && (
           <FuadAssistant 
@@ -436,9 +456,10 @@ const AppContent = () => {
       {isProfileCreationRequired && <LoginModal onRegisterSuccess={handleRegisterSuccess} />}
       {isEditProfileModalOpen && <EditProfileModal onClose={() => setIsEditProfileModalOpen(false)} />}
       
-      {isProfileCreationRequired && (
+      {isAnyOverlayActive && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
       )}
+      {isLoginWallVisible && <LoginWallModal />}
     </div>
   );
 }

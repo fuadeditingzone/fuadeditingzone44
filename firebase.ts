@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCA_nAtmaN9Bs7a5q-c9za5eSMnk0Ys5Xs",
   authDomain: "fuad-editing-zone.firebaseapp.com",
   projectId: "fuad-editing-zone",
-  storageBucket: "fuad-editing-zone.appspot.com",
+  storageBucket: "fuad-editing-zone.firebasestorage.app",
   messagingSenderId: "832389657221",
   appId: "1:832389657221:web:98bec320f684d345376fec",
   measurementId: "G-QJNZVBS5P5"

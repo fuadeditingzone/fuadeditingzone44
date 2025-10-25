@@ -1,8 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import type { User } from '../types';
 import { auth, db, storage, firebaseInitialized } from '../firebase';
-import { GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface UserContextType {
@@ -25,7 +25,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isProfileCreationRequired, setIsProfileCreationRequired] = useState(false);
 
     const checkUserProfile = useCallback(async (user: FirebaseUser) => {
-        const userRef = doc(db!, "users", user.uid);
+        if (!db) return;
+        const userRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(userRef);
         if (docSnap.exists()) {
             setCurrentUser(docSnap.data() as User);
@@ -54,18 +55,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsAuthLoading(false);
         });
 
-        getRedirectResult(auth).catch(error => {
-            console.error("Error getting redirect result:", error);
-            setIsAuthLoading(false);
-        });
-
         return () => unsubscribe();
     }, [checkUserProfile]);
 
-    const login = useCallback(() => {
+    const login = useCallback(async () => {
         if (!auth) return;
         const provider = new GoogleAuthProvider();
-        signInWithRedirect(auth, provider);
+        try {
+            await signInWithPopup(auth, provider);
+            // onAuthStateChanged will handle the successful login
+        } catch (error) {
+            console.error("Error during Google sign-in:", error);
+            // Handle specific errors like popup blocked by browser
+        }
     }, []);
 
     const logout = useCallback(async () => {
@@ -91,8 +93,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!db || !firebaseUser) return null;
 
         let photoURL = firebaseUser.photoURL || '';
-        if (photoFile) {
-            const storageRef = ref(storage!, `profile-pictures/${firebaseUser.uid}`);
+        if (photoFile && storage) {
+            const storageRef = ref(storage, `profile-pictures/${firebaseUser.uid}`);
             await uploadBytes(storageRef, photoFile);
             photoURL = await getDownloadURL(storageRef);
         }
