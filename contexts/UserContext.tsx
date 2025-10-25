@@ -3,7 +3,7 @@ import { auth, db, storage, database } from '../firebase';
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, collectionGroup, limit } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
-import { ref as databaseRef, set, onValue, serverTimestamp } from 'firebase/database';
+import { ref as databaseRef, set, onValue, serverTimestamp, Unsubscribe } from 'firebase/database';
 import type { User } from '../types';
 
 interface UserContextType {
@@ -34,7 +34,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [rtdbName, setRtdbName] = useState<string | null>(null);
     
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        let rtdbUnsubscribe: Unsubscribe | null = null;
+
+        const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (rtdbUnsubscribe) {
+                rtdbUnsubscribe();
+                rtdbUnsubscribe = null;
+            }
+            
             setFirebaseUser(user);
             if (user) {
                 // Write to Realtime Database
@@ -47,7 +54,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 // Listen for name changes from RTDB for display requirement
                 const displayNameRtdbRef = databaseRef(database, 'users/' + user.uid + '/displayName');
-                onValue(displayNameRtdbRef, (snapshot) => {
+                rtdbUnsubscribe = onValue(displayNameRtdbRef, (snapshot) => {
                     setRtdbName(snapshot.val());
                 });
 
@@ -65,7 +72,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             setLoading(false);
         });
-        return () => unsubscribe();
+        
+        return () => {
+            authUnsubscribe();
+            if (rtdbUnsubscribe) {
+                rtdbUnsubscribe();
+            }
+        };
     }, []);
 
     const handleGoogleSignIn = async () => {
