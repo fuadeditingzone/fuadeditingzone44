@@ -31,6 +31,7 @@ const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 };
 
+// Fix: Update API key array with user-provided fallbacks to mitigate quota errors.
 const API_KEYS = [
   process.env.API_KEY || 'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E',
   'AIzaSyD4zM7WQ_4RBI5osBG1XRozOX4s90kPfAc',
@@ -132,7 +133,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const lastUserActivityRef = useRef<number>(Date.now());
     const movementReactionCooldownRef = useRef(0);
     
-    const processStoryQueueRef = useRef<() => Promise<void>>();
+    // Fix: Provide an explicit initial value to useRef to address the "Expected 1 arguments, but got 0" error.
+    const processStoryQueueRef = useRef<(() => Promise<void>) | null>(null);
     
     const initialX = typeof window !== 'undefined' ? window.innerWidth / 2 - 32 : 0;
     const initialY = typeof window !== 'undefined' ? window.innerHeight - 96 : 0;
@@ -169,7 +171,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
-            // FIX: Updated system prompt to enhance AI personality and behavior.
+            // User-provided system prompt to define AI personality and behavior.
             let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
@@ -208,7 +210,7 @@ If unsure, default to English but change instantly if the user switches tone or 
 ━━━━━━━━━━━━━━━━━━
 🎭 PERSONALITY:
 - Sounds human, not robotic.
-- Mix emotion and humor (laughs, sighs, sleepy tone, etc.).
+- Mix emotion and humor. Use emojis instead of bracketed emotions like (laughs) or [sighs].
 - Use regional expressions naturally:
   - Urdu/Hindi: “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Bas karo na!”
   - Bangla: “Eita dekho!”, “Ki bolbo!”, “Haay re!”, “Besh!”
@@ -267,7 +269,7 @@ If relevant to emotion or humor, play short meme or sound reactions:
 - Auto-handle language, humor, and timing on your own.
 - Always stay dynamic, expressive, and emotionally real — like a human friend.
 
-- When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
+- When returning audio + text, make it natural and expressive. For pauses, you can use the format [PAUSE=1-2] where numbers are seconds.
 
 ━━━━━━━━━━━━━━━━━━
 🌍 LANGUAGE MODE:
@@ -337,7 +339,6 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
     
     useEffect(() => {
         try {
-            // FIX: Strip non-serializable 'component' property before saving to prevent crashes.
             const serializableMessages = messages.map(({ component, ...rest }) => rest);
             localStorage.setItem('fuadAssistantChatHistory', JSON.stringify(serializableMessages));
         } catch (error) {

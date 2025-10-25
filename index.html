@@ -342,14 +342,27 @@
       }
 
       /* State-based visibility */
-      .app-content { visibility: hidden; opacity: 0; transition: opacity 1.5s ease-in; }
+      .app-content { 
+        visibility: hidden; 
+        opacity: 0; 
+        transition: opacity 1.5s ease-in; 
+      }
       
-      .state-welcome .app-content,
-      .state-entering .app-content { visibility: hidden; opacity: 0; }
+      .state-welcome .app-content { 
+        visibility: hidden; 
+        opacity: 0; 
+      }
       
-      .state-entered .app-content { visibility: visible; opacity: 1; }
+      .state-entered .app-content { 
+        visibility: visible; 
+        opacity: 1; 
+      }
       
-      .state-entered .welcome-screen { display: none; }
+      .state-entered .welcome-screen { 
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease-out;
+      }
     </style>
   <script type="importmap">
 {

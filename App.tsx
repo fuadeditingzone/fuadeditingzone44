@@ -42,7 +42,7 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
     }
 };
 
-type AppState = 'welcome' | 'entering' | 'entered';
+type AppState = 'welcome' | 'entered';
 
 const AppContent = () => {
   const { currentUser, isLocked, lockSite, unlockSite, findUsers } = useUser();
@@ -96,18 +96,8 @@ const AppContent = () => {
     if (audioUnlocked) {
         safePlay(audioRefs.current.welcomeExit?.play());
     }
-    setAppState('entering');
+    setAppState('entered');
   }, [audioUnlocked]);
-
-
-  useEffect(() => {
-    if (appState === 'entering') {
-      const timer = setTimeout(() => {
-        setAppState('entered');
-      }, 2000); 
-      return () => clearTimeout(timer);
-    }
-  }, [appState]);
 
   useEffect(() => {
     if (currentUser || isLocked || appState !== 'entered') return;
@@ -409,7 +399,9 @@ const AppContent = () => {
   return (
     <div className={`root-container state-${appState}`}>
       <StormyVFXBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} appState={appState} />
-      <WelcomeScreen onEnter={handleEnter} onInteraction={unlockAudio} />
+      <div className="welcome-screen">
+          <WelcomeScreen onEnter={handleEnter} onInteraction={unlockAudio} />
+      </div>
       
       <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
