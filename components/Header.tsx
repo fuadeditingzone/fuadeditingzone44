@@ -9,6 +9,7 @@ interface HeaderProps {
   onScrollTo: (section: 'home' | 'portfolio' | 'contact' | 'about') => void;
   onLoginClick: () => void;
   onViewProfile: (user: User) => void;
+  onEditProfile: () => void;
   onSearch: (query: string) => void;
   isReflecting: boolean;
   onUploadClick: () => void;
@@ -18,7 +19,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = (props) => {
-  const { onScrollTo, onLoginClick, onViewProfile, onSearch, isReflecting, onUploadClick, onPostJobClick, onExploreClick, onJobsClick } = props;
+  const { onScrollTo, onLoginClick, onViewProfile, onEditProfile, onSearch, isReflecting, onUploadClick, onPostJobClick, onExploreClick, onJobsClick } = props;
   const { currentUser, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -153,6 +154,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     onClose={() => setIsProfileMenuOpen(false)}
                     onLogout={logout}
                     onViewProfile={() => onViewProfile(currentUser)}
+                    onEditProfile={onEditProfile}
                   />
                 )}
               </div>

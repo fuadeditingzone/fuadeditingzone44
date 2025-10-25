@@ -31,7 +31,6 @@ const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 };
 
-// Fix: Update API key array with user-provided fallbacks to mitigate quota errors.
 const API_KEYS = [
   process.env.API_KEY || 'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E',
   'AIzaSyD4zM7WQ_4RBI5osBG1XRozOX4s90kPfAc',
@@ -98,7 +97,6 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const saved = localStorage.getItem('fuadAssistantChatHistory');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // Defensive check to prevent crash from malformed old data
                 if (Array.isArray(parsed) && parsed.some(msg => typeof msg.component === 'object' && msg.component !== null)) {
                     throw new Error("Chat history contains invalid non-serializable data.");
                 }
@@ -174,7 +172,6 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
-            // User-provided system prompt to define AI personality and behavior.
             let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
@@ -411,7 +408,6 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
                 source.onended = () => { if (currentAudioSourceRef.current === source) { currentAudioSourceRef.current = null; if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); } };
             } else { addBotMessage(text, { id: messageId, component }); if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); }
         } catch (error) {
-            // FIX: Implement robust API key rotation for TTS. Try all available keys before falling back to text-only mode on rate limit errors.
             console.error("TTS Error:", error);
             const isResourceExhausted = error instanceof ApiError && error.message.includes('RESOURCE_EXHAUSTED');
 
@@ -424,12 +420,10 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
                 }
             }
 
-            // If all keys have been tried and failed
             if (isResourceExhausted) {
                 switchToTextOnlyMode();
             }
 
-            // Fallback to displaying the message as text if TTS fails completely
             addBotMessage(text, { id: messageId, component });
             if (isStoryPart) {
                 processStoryQueueRef.current?.();
@@ -453,7 +447,6 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
 
     useEffect(() => { processStoryQueueRef.current = processStoryQueue; }, [processStoryQueue]);
 
-    // FIX: Refactor handleSubmit to support recursive retries with different API keys on failure.
     const handleSubmit = async (e?: React.FormEvent, textInput?: string, retryAttempt = 0) => {
         e?.preventDefault();
         const currentInput = textInput ?? userInput.trim();
@@ -507,7 +500,7 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
                 if (initializeAI(apiKeyIndexRef.current)) {
                     console.log(`Gemini chat Error, switching to API key index ${apiKeyIndexRef.current}`);
                     await handleSubmit(undefined, currentInput, retryAttempt + 1);
-                    return; // exit after recursive call
+                    return;
                 }
             }
             
@@ -537,7 +530,7 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
     useEffect(() => {
         if (newlyRegisteredUser) {
             stopCurrentSpeech(true);
-            proactiveMessageQueueRef.current = []; // Clear queue for this special message
+            proactiveMessageQueueRef.current = [];
             const welcomeText = `Welcome aboard, ${newlyRegisteredUser.name}! Your profile is all set. It's great to have you here.`;
             proactiveSpeakAndDisplay(welcomeText, <ProfileCardInChat user={newlyRegisteredUser} />);
             onNewUserHandled();

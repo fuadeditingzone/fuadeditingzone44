@@ -1,8 +1,4 @@
-
 import React from 'react';
-
-// Refined icons using official brand marks for better clarity and a more professional look.
-// These are designed to be placed inside a styled circular link container.
 
 export const FacebookIcon = ({ className }: { className?: string }) => (
   <i className={`fa-brands fa-facebook-f ${className || ''}`} />
@@ -61,7 +57,6 @@ export const GoogleIcon = ({ className }: { className?: string }) => (
 export const LinkedInIcon = ({ className }: { className?: string }) => (
   <i className={`fa-brands fa-linkedin-in ${className || ''}`} />
 );
-
 
 // --- Service Icons ---
 export const PhotoManipulationIcon = ({ className }: { className?: string }) => (
@@ -172,16 +167,15 @@ export const FastForwardIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-// --- Chat Icons ---
 export const PaperAirplaneIcon = ({ className }: { className?: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M3.105 2.289a.75.75 0 0 0-.826.95l1.414 4.949a.75.75 0 0 0 .95.826L11.25 9.25v1.5L4.643 12.51a.75.75 0 0 0-.95.826l-1.414 4.949a.75.75 0 0 0 .95.826L17.64 12l-14.535-9.711z" />
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" />
     </svg>
 );
 
 export const ChatBubbleIcon = ({ className }: { className?: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.761 9.761 0 0 1-2.542-.381 1.483 1.483 0 0 0-.942.13l-4.163 1.162a.75.75 0 0 1-.962-.962l1.162-4.163a1.483 1.483 0 0 0 .13-.942A9.761 9.761 0 0 1 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.76 9.76 0 0 1-2.53-0.417m-1.023-.77A48.11 48.11 0 0 1 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
     </svg>
 );
 
@@ -194,8 +188,7 @@ export const UploadIcon = ({ className }: { className?: string }) => (
 
 export const BriefcaseIcon = ({ className }: { className?: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.07a2.25 2.25 0 0 1-2.25 2.25H5.998a2.25 2.25 0 0 1-2.25-2.25v-4.07a2.25 2.25 0 0 1 .526-1.432l3.3-3.3a2.25 2.25 0 0 1 1.59-.658h5.63a2.25 2.25 0 0 1 1.59.658l3.3 3.3a2.25 2.25 0 0 1 .526 1.432Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 6.75h4.5a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75V7.5a.75.75 0 0 1 .75-.75Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.098a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 2.25 18.25V14.15M6.75 21H9a2.25 2.25 0 0 0 2.25-2.25V15M12 15V4.5m0 10.5h3.75a2.25 2.25 0 0 1 2.25 2.25V21M12 4.5H9A2.25 2.25 0 0 0 6.75 6.75v8.25" />
     </svg>
 );
 
@@ -220,5 +213,13 @@ export const CheckCircleIcon = ({ className }: { className?: string }) => (
 export const ExclamationTriangleIcon = ({ className }: { className?: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+    </svg>
+);
+
+
+export const CameraIcon = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
     </svg>
 );

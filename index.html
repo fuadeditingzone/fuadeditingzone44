@@ -61,13 +61,10 @@
       }
       
       /* --- Button Active/Pressed State --- */
-      /* Provides responsive visual feedback when buttons and button-like links are pressed. */
-      /* Increased specificity using an attribute selector [class] to override Tailwind's hover states. */
       button[class]:active,
       a[class*="group"]:active {
         transform: scale(0.96);
         filter: brightness(0.9);
-        /* Use a quick transition for a snappy "pressed" feel */
         transition: transform 0.05s ease-in-out, filter 0.05s ease-in-out;
       }
 
@@ -316,7 +313,7 @@
       /* System Cursor Styles */
       body.system-cursor-active { cursor: default !important; }
       body.system-cursor-active a, body.system-cursor-active button { cursor: pointer !important; }
-      body.system-cursor-active input[type="text"], body.system-cursor-active textarea { cursor: text !important; }
+      body.system-cursor-active input, body.system-cursor-active textarea { cursor: text !important; }
 
       /* --- WELCOME / INTRO SEQUENCE --- */
       @keyframes vortex-swirl {
@@ -342,27 +339,11 @@
       }
 
       /* State-based visibility */
-      .app-content { 
-        visibility: hidden; 
-        opacity: 0; 
-        transition: opacity 1.5s ease-in; 
-      }
-      
-      .state-welcome .app-content { 
-        visibility: hidden; 
-        opacity: 0; 
-      }
-      
-      .state-entered .app-content { 
-        visibility: visible; 
-        opacity: 1; 
-      }
-      
-      .state-entered .welcome-screen { 
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.5s ease-out;
-      }
+      .app-content-wrapper { visibility: hidden; opacity: 0; transition: opacity 1.5s ease-in; }
+      body.state-welcome .app-content-wrapper { visibility: hidden; opacity: 0; }
+      body.state-entered .app-content-wrapper { visibility: visible; opacity: 1; }
+      body.state-entered .welcome-screen { opacity: 0; pointer-events: none; transition: opacity 0.5s ease-out; }
+
     </style>
   <script type="importmap">
 {
@@ -375,7 +356,7 @@
 }
 </script>
 </head>
-  <body>
+  <body class="state-welcome">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

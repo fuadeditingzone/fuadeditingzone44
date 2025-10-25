@@ -9,10 +9,11 @@ interface UserContextType {
     logout: () => void;
     lockSite: () => void;
     unlockSite: () => void;
-    isUsernameTaken: (username: string) => boolean;
+    isUsernameTaken: (username: string, currentUsername?: string) => boolean;
     isEmailTaken: (email: string) => boolean;
     findUsers: (query: string) => User[];
     getUserByUsername: (username: string) => User | undefined;
+    updateUser: (username: string, updatedData: Partial<User>) => boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -32,11 +33,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const storedCurrentUser = localStorage.getItem(CURRENT_USER_KEY);
             
             if (storedUsers) {
-                // FIX: Cast parsed JSON to ensure correct type for user database.
                 setUsers(JSON.parse(storedUsers) as Record<string, User>);
             }
             if (storedCurrentUser) {
-                // FIX: Cast parsed JSON to ensure correct type for current user.
                 setCurrentUser(JSON.parse(storedCurrentUser) as User);
             }
         } catch (error) {
@@ -65,12 +64,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }
 
-    const isUsernameTaken = useCallback((username: string) => {
-        return !!users[username.toLowerCase()];
+    const isUsernameTaken = useCallback((username: string, currentUsername?: string) => {
+        const usernameLower = username.toLowerCase();
+        if (currentUsername && usernameLower === currentUsername.toLowerCase()) {
+            return false;
+        }
+        return !!users[usernameLower];
     }, [users]);
 
     const isEmailTaken = useCallback((email: string) => {
-        // FIX: Add defensive check for user.email to prevent runtime errors with malformed data.
         return Object.values(users).some((user: User) => user.email && user.email.toLowerCase() === email.toLowerCase());
     }, [users]);
 
@@ -87,9 +89,34 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLocked(false);
         return userData;
     }, [users, isUsernameTaken, isEmailTaken]);
+    
+    const updateUser = useCallback((username: string, updatedData: Partial<User>): boolean => {
+        const usernameLower = username.toLowerCase();
+        const existingUser = users[usernameLower];
+        if (!existingUser) return false;
+
+        const newUsername = updatedData.username ? updatedData.username.toLowerCase() : usernameLower;
+        
+        // If username is changing, we need to move the user record
+        const updatedUsers = { ...users };
+        if (newUsername !== usernameLower) {
+            delete updatedUsers[usernameLower];
+        }
+        
+        const finalUser = { ...existingUser, ...updatedData };
+        updatedUsers[newUsername] = finalUser;
+
+        setUsers(updatedUsers);
+        persistUsers(updatedUsers);
+        
+        if (currentUser?.username.toLowerCase() === usernameLower) {
+            setCurrentUser(finalUser);
+            persistCurrentUser(finalUser);
+        }
+        return true;
+    }, [users, currentUser]);
 
     const login = useCallback((email: string): User | null => {
-        // FIX: Add defensive check for u.email to prevent runtime errors with malformed data.
         const user = Object.values(users).find((u: User) => u.email && u.email.toLowerCase() === email.toLowerCase());
         if (user) {
             setCurrentUser(user);
@@ -118,7 +145,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const findUsers = useCallback((query: string) => {
         if (!query) return [];
         const queryLower = query.toLowerCase();
-        // FIX: Add defensive checks for user properties to prevent runtime errors.
         return Object.values(users).filter((user: User) => 
             (user.username && user.username.toLowerCase().includes(queryLower)) ||
             (user.name && user.name.toLowerCase().includes(queryLower))
@@ -140,8 +166,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isUsernameTaken,
         isEmailTaken,
         findUsers,
-        getUserByUsername
-    }), [currentUser, isLocked, register, login, logout, lockSite, unlockSite, isUsernameTaken, isEmailTaken, findUsers, getUserByUsername, isInitialized]);
+        getUserByUsername,
+        updateUser
+    }), [currentUser, isLocked, register, login, logout, lockSite, unlockSite, isUsernameTaken, isEmailTaken, findUsers, getUserByUsername, updateUser, isInitialized]);
 
     return (
         <UserContext.Provider value={value}>

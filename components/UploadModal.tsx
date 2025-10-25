@@ -61,7 +61,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' || e.key === ',') {
             e.preventDefault();
-            const newTag = tagInput.trim();
+            const newTag = tagInput.trim().toLowerCase();
             if (newTag && !tags.includes(newTag)) {
                 setTags([...tags, newTag]);
             }
@@ -108,7 +108,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
                         <div onDragEnter={handleDragEvents} onDragOver={handleDragEvents} onDragLeave={handleDragEvents} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()} className={`relative flex-grow flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragging ? 'border-red-500 bg-red-500/10' : 'border-gray-600 hover:border-red-500/50'}`}>
                            <input type="file" ref={fileInputRef} onChange={(e) => handleFileChange(e.target.files ? e.target.files[0] : null)} className="hidden" accept="image/*,video/*" />
                            {mediaPreview ? (
-                               mediaType === 'image' ? <img src={mediaPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" /> : <video src={mediaPreview} className="max-h-full max-w-full object-contain rounded-md" />
+                               mediaType === 'image' ? <img src={mediaPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" /> : <video src={mediaPreview} className="max-h-full max-w-full object-contain rounded-md" controls={false} />
                            ) : (
                                <div className="text-center text-gray-400">
                                    <UploadIcon className="w-12 h-12 mx-auto" />

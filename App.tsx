@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User, Post, Job } from './types';
 import { GRAPHIC_WORKS, PROFILE_CREATION_SOUND, BACKGROUND_MUSIC_TRACKS } from './constants';
 import { UserProvider, useUser } from './contexts/UserContext';
-import { MarketplaceProvider, useMarketplace } from './contexts/MarketplaceContext';
+import { MarketplaceProvider } from './contexts/MarketplaceContext';
 
 import { CustomCursor } from './components/CustomCursor';
 import { StormyVFXBackground } from './components/StormyVFXBackground';
@@ -13,6 +13,7 @@ import { Contact } from './components/Contact';
 import { AboutAndFooter } from './components/AboutAndFooter';
 import { ModalViewer, GalleryGridModal } from './components/ModalViewer';
 import { ProfileModal } from './components/ProfileModal';
+import { EditProfileModal } from './components/EditProfileModal';
 import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
 import { FuadAssistant } from './components/FuadAssistant';
@@ -63,6 +64,7 @@ const AppContent = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSearchResultsModalOpen, setIsSearchResultsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
@@ -107,7 +109,13 @@ const AppContent = () => {
   const handleEnter = useCallback(() => {
     if (audioUnlocked) safePlay(audioRefs.current.welcomeExit?.play());
     setAppState('entered');
+    document.body.classList.remove('state-welcome');
+    document.body.classList.add('state-entered');
   }, [audioUnlocked]);
+
+  useEffect(() => {
+      document.body.classList.add('state-welcome');
+  }, []);
 
   useEffect(() => {
     if (currentUser || isLocked || appState !== 'entered') return;
@@ -139,16 +147,30 @@ const AppContent = () => {
   }, [getUserByUsername, viewProfile, viewingJob]);
 
   useEffect(() => {
-    const path = window.location.pathname;
-    if (path.length > 1 && appState === 'entered') {
-        const username = path.substring(1).toLowerCase();
-        const userToShow = getUserByUsername(username);
-        if (userToShow) {
-            setViewingUser(userToShow);
-            setIsProfileModalOpen(true);
+    const handlePopState = () => {
+        const path = window.location.pathname;
+        if (path.length > 1) {
+            const username = path.substring(1).toLowerCase();
+            const userToShow = getUserByUsername(username);
+            if (userToShow) {
+                setViewingUser(userToShow);
+                setIsProfileModalOpen(true);
+            }
+        } else {
+            setIsProfileModalOpen(false);
+            setViewingUser(null);
         }
+    };
+    
+    // Initial check on load
+    if (appState === 'entered') {
+        handlePopState();
     }
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [getUserByUsername, appState]);
+
 
   const handleSearch = (query: string) => {
       const results = findUsers(query);
@@ -158,8 +180,8 @@ const AppContent = () => {
   
   const handleLoginModalClose = useCallback(() => {
     setIsLoginModalOpen(false);
-    unlockSite();
-  }, [unlockSite]);
+    if (isLocked) unlockSite();
+  }, [isLocked, unlockSite]);
 
   const scrollToSection = useCallback((section: keyof typeof sections) => {
     const sectionElement = sections[section].current;
@@ -256,7 +278,7 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  const anyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen || isExploreModalOpen || isJobsModalOpen || isUploadModalOpen || isPostJobModalOpen || !!viewingJob;
+  const anyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen || isExploreModalOpen || isJobsModalOpen || isUploadModalOpen || isPostJobModalOpen || !!viewingJob || isEditProfileModalOpen;
   useEffect(() => { document.body.style.overflow = anyModalOpen ? 'hidden' : 'auto'; }, [anyModalOpen]);
   
   useEffect(() => {
@@ -311,54 +333,56 @@ const AppContent = () => {
   }, [audioUnlocked]);
 
   return (
-    <div className={`root-container state-${appState}`}>
+    <>
+      <CustomCursor isVisible={!isLocked && appState === 'entered'} />
       <StormyVFXBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} appState={appState} />
       <div className="welcome-screen">
           <WelcomeScreen onEnter={handleEnter} onInteraction={unlockAudio} />
       </div>
       
-      <CustomCursor isVisible={!isLocked && appState === 'entered'} />
+      <div className="app-content-wrapper">
+        <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+          <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
+          
+          <Header 
+              onScrollTo={scrollToSection} onLoginClick={() => setIsLoginModalOpen(true)} onViewProfile={viewProfile} onSearch={handleSearch} isReflecting={isReflecting} 
+              onUploadClick={() => setIsUploadModalOpen(true)} onPostJobClick={() => setIsPostJobModalOpen(true)} onExploreClick={() => setIsExploreModalOpen(true)} onJobsClick={() => setIsJobsModalOpen(true)} onEditProfile={() => setIsEditProfileModalOpen(true)}
+          />
+          <main>
+            <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
+            <div ref={sections.portfolio} id="portfolio"><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
+            <div ref={sections.contact} id="contact"><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
+          </main>
+          <div ref={sections.about} id="about"><AboutAndFooter isReflecting={isReflecting} /></div>
+          
+          {modalState && <ModalViewer state={modalState} onClose={closeModal} onNext={showNext} onPrev={showPrev} />}
+          {isGalleryGridOpen && <GalleryGridModal items={GRAPHIC_WORKS} onClose={() => setIsGalleryGridOpen(false)} onImageClick={openSingleImageViewer} />}
+          {singleImageViewerState && <ModalViewer state={singleImageViewerState} onClose={() => setSingleImageViewerState(null)} onNext={showNextInSingleImageViewer} onPrev={showPrevInSingleImageViewer} />}
+          {isServicesPopupOpen && <ServicesPopup onClose={() => setIsServicesPopupOpen(false)} />}
+          {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
+          {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
+          
+          {appState === 'entered' && (
+            <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileModalOpen} onExcessiveMovement={excessiveMovement} user={currentUser} isLocked={isLocked} setIsParallaxActive={setIsParallaxActive} newlyRegisteredUser={newlyRegisteredUser} onNewUserHandled={() => setNewlyRegisteredUser(null)} playMusic={playMusic} pauseMusic={pauseMusic} setVolume={setVolume} />
+          )}
+        </div>
 
-      <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
-        <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
-        
-        <Header 
-            onScrollTo={scrollToSection} onLoginClick={() => setIsLoginModalOpen(true)} onViewProfile={viewProfile} onSearch={handleSearch} isReflecting={isReflecting} 
-            onUploadClick={() => setIsUploadModalOpen(true)} onPostJobClick={() => setIsPostJobModalOpen(true)} onExploreClick={() => setIsExploreModalOpen(true)} onJobsClick={() => setIsJobsModalOpen(true)}
-        />
-        <main>
-          <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
-          <div ref={sections.portfolio} id="portfolio"><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
-          <div ref={sections.contact} id="contact"><Contact onEmailClick={() => openOrderModal('email')} isReflecting={isReflecting} /></div>
-        </main>
-        <div ref={sections.about} id="about"><AboutAndFooter isReflecting={isReflecting} /></div>
-        
-        {modalState && <ModalViewer state={modalState} onClose={closeModal} onNext={showNext} onPrev={showPrev} />}
-        {isGalleryGridOpen && <GalleryGridModal items={GRAPHIC_WORKS} onClose={() => setIsGalleryGridOpen(false)} onImageClick={openSingleImageViewer} />}
-        {singleImageViewerState && <ModalViewer state={singleImageViewerState} onClose={() => setSingleImageViewerState(null)} onNext={showNextInSingleImageViewer} onPrev={showPrevInSingleImageViewer} />}
-        {isServicesPopupOpen && <ServicesPopup onClose={() => setIsServicesPopupOpen(false)} />}
-        {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
-        {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
-        
-        {appState === 'entered' && (
-          <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileModalOpen} onExcessiveMovement={excessiveMovement} user={currentUser} isLocked={isLocked} setIsParallaxActive={setIsParallaxActive} newlyRegisteredUser={newlyRegisteredUser} onNewUserHandled={() => setNewlyRegisteredUser(null)} playMusic={playMusic} pauseMusic={pauseMusic} setVolume={setVolume} />
+        {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={handleProfileModalClose} onEditProfile={() => setIsEditProfileModalOpen(true)} />}
+        {isEditProfileModalOpen && currentUser && <EditProfileModal user={currentUser} onClose={() => setIsEditProfileModalOpen(false)} />}
+        {isLoginModalOpen && <LoginModal onClose={handleLoginModalClose} onRegisterSuccess={handleRegisterSuccess} />}
+        {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
+
+        {isExploreModalOpen && <ExploreModal onClose={() => setIsExploreModalOpen(false)} onViewPost={setViewingPost} onViewProfile={viewProfileByUsername} />}
+        {isJobsModalOpen && <JobsModal onClose={() => setIsJobsModalOpen(false)} onViewJob={setViewingJob} onPostJobClick={() => { setIsJobsModalOpen(false); setIsPostJobModalOpen(true); }} />}
+        {isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
+        {isPostJobModalOpen && <PostJobModal onClose={() => setIsPostJobModalOpen(false)} />}
+        {viewingJob && <JobDetailsModal job={viewingJob} onClose={() => setViewingJob(null)} onViewProfile={viewProfileByUsername} />}
+
+        {isLocked && !isLoginModalOpen && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
         )}
       </div>
-
-      {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={handleProfileModalClose} />}
-      {isLoginModalOpen && <LoginModal onClose={handleLoginModalClose} onRegisterSuccess={handleRegisterSuccess} />}
-      {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
-
-      {isExploreModalOpen && <ExploreModal onClose={() => setIsExploreModalOpen(false)} onViewPost={setViewingPost} onViewProfile={viewProfileByUsername} />}
-      {isJobsModalOpen && <JobsModal onClose={() => setIsJobsModalOpen(false)} onViewJob={setViewingJob} onPostJobClick={() => { setIsJobsModalOpen(false); setIsPostJobModalOpen(true); }} />}
-      {isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
-      {isPostJobModalOpen && <PostJobModal onClose={() => setIsPostJobModalOpen(false)} />}
-      {viewingJob && <JobDetailsModal job={viewingJob} onClose={() => setViewingJob(null)} onViewProfile={viewProfileByUsername} />}
-
-      {isLocked && !isLoginModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
-      )}
-    </div>
+    </>
   );
 }
 

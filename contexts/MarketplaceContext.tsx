@@ -115,15 +115,13 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const incrementPostView = useCallback((postId: string) => {
         setPosts(prev => {
             const updated = prev.map(p => p.id === postId ? { ...p, views: p.views + 1 } : p);
-            persistData(POSTS_DB_KEY, updated);
+            // Do not persist immediately to avoid spamming localStorage on every view
             return updated;
         });
     }, []);
     
     const hireDesignerForJob = useCallback((jobId: string, designerUsername: string) => {
         setJobs(prev => {
-            // FIX: Use 'as const' to assert the literal type of 'status' and prevent a TypeScript error
-            // where the type is incorrectly widened to a generic 'string'.
             const updated = prev.map(j => j.id === jobId ? { ...j, status: 'in-progress' as const, hiredDesignerUsername: designerUsername } : j);
             persistData(JOBS_DB_KEY, updated);
             return updated;
@@ -133,7 +131,6 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const hasSubmitted = useCallback((jobId: string, username: string) => {
         return submissions.some(s => s.jobId === jobId && s.designerUsername === username);
     }, [submissions]);
-
 
     const value = useMemo(() => ({
         posts,

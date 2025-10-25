@@ -3,7 +3,7 @@ import React, { useRef, useEffect } from 'react';
 interface StormyVFXBackgroundProps {
   onLightningFlash: () => void;
   isParallaxActive: boolean;
-  appState: 'welcome' | 'entering' | 'entered';
+  appState: 'welcome' | 'entered';
 }
 
 export const StormyVFXBackground: React.FC<StormyVFXBackgroundProps> = ({ onLightningFlash, isParallaxActive, appState }) => {

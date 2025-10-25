@@ -61,7 +61,7 @@ export const JobsModal: React.FC<JobsModalProps> = ({ onClose, onViewJob, onPost
                                             <CurrencyDollarIcon className="w-5 h-5" />
                                             <span>{job.budget} {job.currency}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-yellow-400 px-3 py-1 bg-yellow-500/10 rounded-full">
+                                        <div className="flex items-center gap-2 text-yellow-400 font-semibold px-3 py-1 bg-yellow-500/10 rounded-full">
                                             <ClockIcon className="w-5 h-5" />
                                             <span>{job.deadline}</span>
                                         </div>
@@ -70,9 +70,9 @@ export const JobsModal: React.FC<JobsModalProps> = ({ onClose, onViewJob, onPost
                             </button>
                         ))
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center">
-                            <h3 className="text-2xl font-bold text-white">The Market is Quiet</h3>
-                            <p className="text-gray-400 mt-2">No jobs have been posted yet. If you're a client, be the first to find talent!</p>
+                         <div className="flex flex-col items-center justify-center h-full text-center">
+                            <h3 className="text-2xl font-bold text-white">The Job Board is Quiet... For Now</h3>
+                            <p className="text-gray-400 mt-2">No open jobs at the moment. Check back soon for new opportunities!</p>
                         </div>
                     )}
                 </div>

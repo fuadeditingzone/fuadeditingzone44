@@ -35,7 +35,9 @@ export const ExploreModal: React.FC<ExploreModalProps> = ({ onClose, onViewPost,
     
     const handlePostClick = (post: Post) => {
         incrementPostView(post.id);
-        onViewPost(post);
+        // This will be handled by a new PostDetailsModal in a future step
+        // For now, it could open a simple viewer or do nothing
+        console.log("Viewing post:", post.title);
     };
 
     return (
@@ -61,9 +63,9 @@ export const ExploreModal: React.FC<ExploreModalProps> = ({ onClose, onViewPost,
                                             </div>
                                         )}
                                     </button>
-                                    <div className="absolute bottom-0 left-0 right-0 p-3 text-white transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                                    <div className="absolute bottom-0 left-0 right-0 p-3 text-white transform translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none">
                                         <h3 className="font-bold truncate">{post.title}</h3>
-                                        <button onClick={(e) => { e.stopPropagation(); onViewProfile(post.authorUsername); }} className="text-sm text-gray-300 hover:text-red-400 transition-colors flex items-center gap-2 mt-1">
+                                        <button onClick={(e) => { e.stopPropagation(); onViewProfile(post.authorUsername); }} className="text-sm text-gray-300 hover:text-red-400 transition-colors flex items-center gap-2 mt-1 pointer-events-auto">
                                             {post.authorAvatarUrl ? <img src={post.authorAvatarUrl} className="w-5 h-5 rounded-full object-cover"/> : <div className="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center text-xs">{post.authorName.charAt(0)}</div>}
                                             {post.authorName}
                                         </button>

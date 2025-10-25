@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { CloseIcon, LinkedInIcon, FacebookIcon, InstagramIcon, BehanceIcon, PlayIcon } from './Icons';
 import type { User, Post } from '../types';
 import { useMarketplace } from '../contexts/MarketplaceContext';
+import { useUser } from '../contexts/UserContext';
 import { LazyImage } from './LazyImage';
 
 interface ProfileModalProps {
     user: User;
     onClose: () => void;
+    onEditProfile: () => void;
 }
 
 const SocialIconLink: React.FC<{ href: string; icon: React.ComponentType<{ className?: string }>; name: string; }> = ({ href, icon: Icon, name }) => (
@@ -16,11 +18,14 @@ const SocialIconLink: React.FC<{ href: string; icon: React.ComponentType<{ class
     </a>
 );
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onEditProfile }) => {
+    const { currentUser } = useUser();
     const [copied, setCopied] = useState(false);
     const { getPostsByUsername } = useMarketplace();
     const [userPosts, setUserPosts] = useState<Post[]>([]);
     
+    const isOwnProfile = currentUser?.username === user.username;
+
     useEffect(() => {
         if (user.role === 'designer') {
             setUserPosts(getPostsByUsername(user.username));
@@ -82,6 +87,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => 
                           <div className="text-center mt-4 text-gray-300 bg-black/20 p-3 rounded-lg max-w-md mx-auto">
                               <p>{user.bio}</p>
                           </div>
+                        )}
+                        
+                        {isOwnProfile && (
+                             <button 
+                                onClick={() => { onClose(); onEditProfile(); }}
+                                className="mt-4 bg-gray-700/50 text-gray-200 font-semibold py-2 px-5 rounded-full transition-all duration-300 hover:bg-gray-600 hover:text-white"
+                             >
+                                Edit Profile
+                            </button>
                         )}
                         
                         {hasSocials && (
