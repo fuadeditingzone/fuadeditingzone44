@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { LOGO_URL } from '../constants';
-import { StreamPackageIcon, ChatBubbleIcon, VfxIcon } from './Icons';
+import { StreamPackageIcon, ChatBubbleIcon, VfxIcon, GoogleIcon } from './Icons';
 
 // Simple inline SVG icons for benefits list and form states
 const UsersIcon = ({ className }: { className?: string }) => (
@@ -24,12 +24,6 @@ const SpinnerIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const CheckIcon = ({ className }: { className?: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-    </svg>
-);
-
 const benefits = [
     { icon: StreamPackageIcon, text: "Play background music by command." },
     { icon: UsersIcon, text: "Become visible with a public profile." },
@@ -46,90 +40,71 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSuccess }) => {
-    const { register, isUsernameTaken } = useUser();
+    const { register, login, isUsernameTaken } = useUser();
     
-    const [email, setEmail] = useState('');
-    const [sentCode, setSentCode] = useState('');
-    const [userCode, setUserCode] = useState('');
-    const [verificationStep, setVerificationStep] = useState<'email' | 'code' | 'verified'>('email');
+    const [step, setStep] = useState<'initial' | 'creating_profile'>('initial');
     const [isLoading, setIsLoading] = useState(false);
+    const [googleUser, setGoogleUser] = useState<{ email: string; name: string } | null>(null);
 
-    const [formData, setFormData] = useState<Omit<User, 'bio'>>({
+    const [formData, setFormData] = useState<Omit<User, 'bio' | 'email'>>({
         username: '', name: '', profession: '', role: 'client',
     });
     const [bio, setBio] = useState('');
     const [error, setError] = useState('');
 
-    const isProfileFormDisabled = verificationStep !== 'verified';
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setError('');
-        if (name === 'email') { setEmail(value); }
-        else if (name === 'userCode') { setUserCode(value); }
-        else if (name === 'username') { setFormData({ ...formData, [name]: value.replace(/\s/g, '').toLowerCase() }); } 
+        if (name === 'username') { setFormData({ ...formData, [name]: value.replace(/\s/g, '').toLowerCase() }); } 
         else if (name === 'bio') { setBio(value); } 
         else { setFormData({ ...formData, [name]: value }); }
     };
 
     const handleProfessionTagClick = (profession: string) => {
-        if (isProfileFormDisabled) return;
         setFormData({ ...formData, profession });
     };
 
-    const handleSendCode = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (!email.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/)) {
-            setError('Please enter a valid email address.');
-            return;
-        }
-        setError('');
+    const handleGoogleSignIn = async () => {
         setIsLoading(true);
+        setError('');
+        
+        // Simulate Google Popup and user selection
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Mocked Google user data. In a real app, this would come from the OAuth response.
+        const mockGoogleUser = { email: 'fuad.dev.portfolio@gmail.com', name: 'Fuad Ahmed' };
 
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        setSentCode(code);
-        console.log(`Verification Code (for testing): ${code}`); // Log for easy testing
+        const existingUser = login(mockGoogleUser.email);
         
         setIsLoading(false);
-        setVerificationStep('code');
-    };
-
-    const handleVerifyCode = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (userCode.length !== 6) {
-            setError('Please enter the 6-digit code.');
-            return;
-        }
-        setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-        
-        if (userCode === sentCode) {
-            setError('');
-            setIsLoading(false);
-            setVerificationStep('verified');
+        if (existingUser) {
+            onClose();
         } else {
-            setError('Invalid code. Please try again.');
-            setIsLoading(false);
+            setGoogleUser(mockGoogleUser);
+            setFormData(prev => ({ ...prev, name: mockGoogleUser.name }));
+            setStep('creating_profile');
         }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (isProfileFormDisabled) {
-            setError('Please verify your email before creating a profile.');
-            return;
-        }
+        if (!googleUser) { setError('An error occurred. Please try signing in again.'); return; }
         if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) { setError('Please fill in all required fields.'); return; }
         if (isUsernameTaken(formData.username)) { setError('This username is already taken. Please choose another.'); return; }
+        
         setError('');
-        const newUser = register({ ...formData, bio });
+        const newUserPayload: User = {
+            ...formData,
+            email: googleUser.email,
+            bio
+        };
+
+        const newUser = register(newUserPayload);
         if (newUser) {
             onRegisterSuccess(newUser);
             onClose();
         } else {
-            setError('An unexpected error occurred. Please try again.');
+            setError('This email is already registered to an account.');
         }
     };
 
@@ -154,79 +129,66 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                         </ul>
                     </div>
                     {/* Form Panel */}
-                    <div className="w-full md:w-3/5 p-8">
-                        <h2 className="text-2xl font-bold text-white mb-2 text-center md:text-left">Create your Profile</h2>
-                        <p className="text-gray-400 mb-6 text-center md:text-left">It's free and only takes a minute.</p>
-                        
-                        {/* --- VERIFICATION SECTION --- */}
-                        <div className="space-y-4 mb-6">
-                            <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                                <div className="flex items-center gap-3">
-                                    <input id="email" name="email" type="email" required value={email} onChange={handleChange} disabled={verificationStep !== 'email' || isLoading} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:opacity-50" placeholder="e.g., jane@example.com"/>
-                                    {verificationStep === 'email' && (
-                                        <button onClick={handleSendCode} disabled={isLoading || !email} className="btn-glow bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-all duration-300 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-40 shrink-0">
-                                            {isLoading ? <SpinnerIcon className="w-5 h-5" /> : 'Send Code'}
-                                        </button>
+                    <div className="w-full md:w-3/5 p-8 flex flex-col justify-center">
+                        {step === 'initial' && (
+                            <div className="text-center">
+                                <h2 className="text-3xl font-bold text-white mb-2">Join the Zone</h2>
+                                <p className="text-gray-400 mb-8">Sign in to unlock personalized features.</p>
+                                <button
+                                    onClick={handleGoogleSignIn}
+                                    disabled={isLoading}
+                                    className="w-full max-w-xs mx-auto btn-glow bg-white text-gray-800 font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:bg-gray-200 transform hover:scale-105 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? (
+                                        <SpinnerIcon className="w-6 h-6" />
+                                    ) : (
+                                        <>
+                                            <GoogleIcon className="w-6 h-6" />
+                                            <span>Continue with Google</span>
+                                        </>
                                     )}
-                                </div>
+                                </button>
                             </div>
-                            
-                            {verificationStep === 'code' && (
-                                <div className="animate-fade-in">
-                                    <label htmlFor="userCode" className="block text-sm font-medium text-gray-300 mb-1">Verification Code</label>
-                                    <p className="text-xs text-gray-400 mb-2">A 6-digit code has been sent to your email.</p>
-                                    <div className="flex items-center gap-3">
-                                        <input id="userCode" name="userCode" type="text" maxLength={6} required value={userCode} onChange={handleChange} disabled={isLoading} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:opacity-50 tracking-[.5em] text-center" placeholder="––––––"/>
-                                        <button onClick={handleVerifyCode} disabled={isLoading || userCode.length !== 6} className="btn-glow bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-all duration-300 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-40 shrink-0">
-                                            {isLoading ? <SpinnerIcon className="w-5 h-5" /> : 'Verify'}
-                                        </button>
+                        )}
+
+                        {step === 'creating_profile' && googleUser && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-white mb-2 text-center md:text-left">Create your Profile</h2>
+                                <p className="text-gray-400 mb-4 text-center md:text-left">Signed in as <span className="font-semibold text-gray-300">{googleUser.email}</span></p>
+                                
+                                <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                                    <div>
+                                        <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                                        <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-red-500 transition-all">
+                                            <span className="text-gray-400 pl-3">@</span>
+                                            <input id="username" name="username" type="text" required value={formData.username} onChange={handleChange} className="w-full bg-transparent py-2 px-2 text-white focus:outline-none" placeholder="youruniqueusername"/>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-
-                            {verificationStep === 'verified' && (
-                                <div className="flex items-center justify-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg animate-fade-in">
-                                    <CheckIcon className="w-6 h-6 text-green-400" />
-                                    <span className="text-green-300 font-semibold">Email Verified! You can now create your profile.</span>
-                                </div>
-                            )}
-                        </div>
-                        
-                        <div className="border-t border-gray-700 my-6"></div>
-
-                        {/* --- PROFILE FORM SECTION --- */}
-                        <form onSubmit={handleSubmit} className={`space-y-4 text-left transition-opacity duration-500 ${isProfileFormDisabled ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-                            <div>
-                                <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                                <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-red-500 transition-all">
-                                    <span className="text-gray-400 pl-3">@</span>
-                                    <input id="username" name="username" type="text" required value={formData.username} onChange={handleChange} className="w-full bg-transparent py-2 px-2 text-white focus:outline-none" placeholder="youruniqueusername"/>
-                                </div>
+                                    <div>
+                                        <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
+                                        <input id="name" name="name" type="text" required value={formData.name} onChange={handleChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="e.g., Jane Doe"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="profession" className="block text-sm font-medium text-gray-300 mb-1">Profession</label>
+                                        <input id="profession" name="profession" type="text" required value={formData.profession} onChange={handleChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="e.g., Art Director, Developer"/>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {professionTags.map(tag => (
+                                                <button key={tag} type="button" onClick={() => handleProfessionTagClick(tag)} className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-md hover:bg-red-500 hover:text-white transition-colors">{tag}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">I am a...</label>
+                                        <div className="flex gap-4">
+                                            <label className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all"><input type="radio" name="role" value="client" checked={formData.role === 'client'} onChange={(e) => setFormData(p => ({...p, role: 'client'}))} className="accent-red-500" /><span className="text-gray-200">Client</span></label>
+                                            <label className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all"><input type="radio" name="role" value="designer" checked={formData.role === 'designer'} onChange={(e) => setFormData(p => ({...p, role: 'designer'}))} className="accent-red-500" /><span className="text-gray-200">Designer</span></label>
+                                        </div>
+                                    </div>
+                                    {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+                                    <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2">Create Profile</button>
+                                </form>
                             </div>
-                            <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
-                                <input id="name" name="name" type="text" required value={formData.name} onChange={handleChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="e.g., Jane Doe"/>
-                            </div>
-                            <div>
-                                <label htmlFor="profession" className="block text-sm font-medium text-gray-300 mb-1">Profession</label>
-                                <input id="profession" name="profession" type="text" required value={formData.profession} onChange={handleChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="e.g., Art Director, Developer"/>
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {professionTags.map(tag => (
-                                        <button key={tag} type="button" onClick={() => handleProfessionTagClick(tag)} className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-md hover:bg-red-500 hover:text-white transition-colors">{tag}</button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">I am a...</label>
-                                <div className="flex gap-4">
-                                    <label className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all"><input type="radio" name="role" value="client" checked={formData.role === 'client'} onChange={(e) => setFormData(p => ({...p, role: 'client'}))} className="accent-red-500" /><span className="text-gray-200">Client</span></label>
-                                    <label className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all"><input type="radio" name="role" value="designer" checked={formData.role === 'designer'} onChange={(e) => setFormData(p => ({...p, role: 'designer'}))} className="accent-red-500" /><span className="text-gray-200">Designer</span></label>
-                                </div>
-                            </div>
-                            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-                            <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2">Create Profile</button>
-                        </form>
+                        )}
                     </div>
                 </div>
             </div>

@@ -5,9 +5,11 @@ interface UserContextType {
     currentUser: User | null;
     isLocked: boolean;
     register: (userData: User) => User | null;
+    login: (email: string) => User | null;
     logout: () => void;
     lockSite: () => void;
     isUsernameTaken: (username: string) => boolean;
+    isEmailTaken: (email: string) => boolean;
     findUsers: (query: string) => User[];
     getUserByUsername: (username: string) => User | undefined;
 }
@@ -64,9 +66,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return !!users[username.toLowerCase()];
     }, [users]);
 
+    const isEmailTaken = useCallback((email: string) => {
+        // FIX: Add explicit type annotation to the callback parameter to prevent type inference issues.
+        return Object.values(users).some((user: User) => user.email.toLowerCase() === email.toLowerCase());
+    }, [users]);
+
     const register = useCallback((userData: User): User | null => {
         const usernameLower = userData.username.toLowerCase();
-        if (isUsernameTaken(usernameLower)) {
+        if (isUsernameTaken(usernameLower) || isEmailTaken(userData.email)) {
             return null;
         }
         const updatedUsers = { ...users, [usernameLower]: userData };
@@ -76,7 +83,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         persistCurrentUser(userData);
         setIsLocked(false);
         return userData;
-    }, [users, isUsernameTaken]);
+    }, [users, isUsernameTaken, isEmailTaken]);
+
+    const login = useCallback((email: string): User | null => {
+        // FIX: Add explicit type annotation to the callback parameter to ensure 'u' is correctly typed as User.
+        const user = Object.values(users).find((u: User) => u.email.toLowerCase() === email.toLowerCase());
+        if (user) {
+            setCurrentUser(user);
+            persistCurrentUser(user);
+            setIsLocked(false);
+            return user;
+        }
+        return null;
+    }, [users]);
 
     const logout = useCallback(() => {
         setCurrentUser(null);
@@ -92,6 +111,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const findUsers = useCallback((query: string) => {
         if (!query) return [];
         const queryLower = query.toLowerCase();
+        // FIX: Add explicit type annotation to the callback parameter to fix type errors.
         return Object.values(users).filter((user: User) => 
             user.username.toLowerCase().includes(queryLower) ||
             user.name.toLowerCase().includes(queryLower)
@@ -106,12 +126,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         isLocked: isInitialized && isLocked && !currentUser,
         register,
+        login,
         logout,
         lockSite,
         isUsernameTaken,
+        isEmailTaken,
         findUsers,
         getUserByUsername
-    }), [currentUser, isLocked, register, logout, lockSite, isUsernameTaken, findUsers, getUserByUsername, isInitialized]);
+    }), [currentUser, isLocked, register, login, logout, lockSite, isUsernameTaken, isEmailTaken, findUsers, getUserByUsername, isInitialized]);
 
     return (
         <UserContext.Provider value={value}>

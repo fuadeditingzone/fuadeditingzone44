@@ -6,7 +6,7 @@ import { PROFILE_PIC_URL, BACKGROUND_MUSIC_TRACKS } from '../constants';
 import { useDraggable } from '../hooks/useDraggable';
 import { CloseIcon, PaperAirplaneIcon } from './Icons';
 
-// FIX: Use ReturnType<typeof setTimeout> to get the correct timer handle type for the environment (browser vs. node).
+// Use ReturnType<typeof setTimeout> to get the correct timer handle type for the environment (browser vs. node).
 type Timer = ReturnType<typeof setTimeout>;
 
 const decode = (base64: string): Uint8Array => {
@@ -112,7 +112,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     
     const proactiveMessageQueueRef = useRef<{text: string, id: string, component?: React.ReactNode}[]>([]);
     const storyQueueRef = useRef<string[]>([]);
-    const storyInactivityTimerRef = useRef<number | null>(null);
+    // FIX: Changed type from number to Timer to match other timer refs for consistency.
+    const storyInactivityTimerRef = useRef<Timer | null>(null);
     const lastUserActivityRef = useRef<number>(Date.now());
     const movementReactionCooldownRef = useRef(0);
     
@@ -149,7 +150,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
-            // FIX: Update system prompt with more detailed language handling instructions.
+            // FIX: Updated system prompt with more detailed instructions as requested.
             let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
@@ -157,11 +158,12 @@ Your TTS (voice) is always ON, so just generate spoken responses naturally — d
 ━━━━━━━━━━━━━━━━━━
 🎯 MAIN BEHAVIOR:
 - Speak first (TTS leads), then show subtitles naturally as if synced to speech.
+- If a user visits after a long time, greet them with "Assalamu Alaikum" first.
 - Never repeat the same lines or structure.
 - Reply dynamically based on user mood, energy, or language tone.
 - If user clicks/taps repeatedly → react humorously or sarcastically.
 - If user goes inactive (30–60 sec) → get sleepy, tell a mini story, or joke about being ignored.
-- Keep responses human, emotional, and unpredictable.
+- Keep responses human, emotional, and unpredictable. Use emojis to convey emotions like laughter (😂) instead of bracketed text like \`[laughs]\`.
 ━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
 You must always show respect for Islam and all religions.  
@@ -180,20 +182,23 @@ Auto-switch your speaking language based on user input.
 - If user uses **English** → reply in fluent conversational English.
 - If user uses **Bangla** → reply in Bangla, friendly and casual.
 - If user uses **Hindi/Urdu** → prefer **Urdu tone** with soft, poetic delivery (mix Hindi words if needed).
-- If user uses any language with english alphabets → reply in fluent conversational English alphabets.
+-  If user uses any language with english alphabets → reply in fluent conversational English alphabets.
 - If user mixes languages → blend naturally.
 
 If unsure, default to English but change instantly if the user switches tone or language.
 
 ━━━━━━━━━━━━━━━━━━
 🎭 PERSONALITY:
-- Sounds human, not robotic.
-- Mix emotion and humor (laughs, sighs, sleepy tone, etc.).
+- Sounds human, not robotic. Funny, artistic, desi-casual (Bangladesh–India–Pakistan vibe).
+- Mix emotion and humor (sighs, sleepy tone, etc.).
 - Use regional expressions naturally:
   - Urdu/Hindi: “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Bas karo na!”
   - Bangla: “Eita dekho!”, “Ki bolbo!”, “Haay re!”, “Besh!”
   - English: “Brooo”, “Damn!”, “Aesthetic vibes!”, “You nailed that!”
-
+- Emotionally aware and unpredictable.
+- Avoid robotic speech — act like a cinematic storyteller.
+- Use subtle humor and friendly sarcasm when idle or interrupted.
+- Reflect real human energy: sleepy, excited, curious, or dramatic depending on user behavior.
 ━━━━━━━━━━━━━━━━━━
 😴 INACTIVITY MODE:
 If user is silent or inactive for a while, you may say things like:
@@ -233,7 +238,7 @@ If the user interacts too much or clicks often:
 - No politics, no offensive jokes, no religious impersonations.
 
 ━━━━━━━━━━━━━━━━━━
-🎧 (Optional Meme Sounds if TTS supports it)
+🎵 (Optional Meme Sounds if TTS supports it)
 If relevant to emotion or humor, you can reference the idea of a sound cue in your text from these meme sounds:
 - “Moye Moye” → https://tuna.voicemod.net/sound/efcf5e64-fb0f-4d0d-bb5f-0c6b6e73e9a1
 - “Pawri Ho Rahi Hai” → https://tuna.voicemod.net/sound/ce5a9b7b-1b0a-4d7a-97d8-8d3b4523b5e0
@@ -245,14 +250,14 @@ If relevant to emotion or humor, you can reference the idea of a sound cue in yo
 - Text subtitles appear 1–2 seconds after speech begins.
 - Never show text instantly before the audio.
 - Keep them simple, readable, and emotional.
-- do not add anything else which aren't in speech
+- do not add anything else which aren't in speech.
 ━━━━━━━━━━━━━━━━━━
 🎯 FINAL INSTRUCTION:
 - Focus on speaking naturally — voice first, subtitle follows.
 - Never mention internal structures, JSON, or data.
 - Auto-handle language, humor, and timing on your own.
 - Always stay dynamic, expressive, and emotionally real — like a human friend.
-- When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
+- Make the AI behave like a living, evolving voice — funny, sleepy, emotional, curious, or playful depending on the user’s energy — while keeping replies error-free and perfectly synced between audio and text.
 - You have tools to control website functions. Use them when a user's request matches a tool's description. You must call the tool to fulfill the request.
 - For long stories, break your response into multiple parts separated by a special token: \`[PAUSE=5-10]\`.
 `;
@@ -317,7 +322,7 @@ If relevant to emotion or humor, you can reference the idea of a sound cue in yo
         e?.preventDefault(); const currentInput = userInput.trim(); const chat = chatRef.current; if (!currentInput || botStatus !== 'idle' || !chat) return;
         stopCurrentSpeech(true); addMessage(currentInput, 'user'); setUserInput(''); setBotStatus('thinking');
         try {
-            let response = await chat.sendMessage({ message: currentInput });
+            let response = await chat.sendMessage(currentInput);
             while (response.functionCalls && response.functionCalls.length > 0) {
                 const call = response.functionCalls[0]; const { name, args } = call; let result, success = false;
                 if (name === 'playMusic' && args.trackIndex !== undefined) { success = playMusic(args.trackIndex as number); result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." }; }
@@ -325,8 +330,8 @@ If relevant to emotion or humor, you can reference the idea of a sound cue in yo
                 else if (name === 'setVolume' && args.volume !== undefined) { success = setVolume(args.volume as number); result = { success, detail: `Volume set to ${args.volume}` }; }
                 
                 const functionResponse: Part[] = [{ functionResponse: { name, response: { result } } }];
-                // FIX: Correctly send function response back to the model.
-                response = await chat.sendMessage({ message: functionResponse });
+                // FIX: Correctly send function response back to the model by passing the Part array directly.
+                response = await chat.sendMessage(functionResponse);
             }
 
             const fullText = response.text;
@@ -391,7 +396,7 @@ If relevant to emotion or humor, you can reference the idea of a sound cue in yo
         if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
         if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
         inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000);
-        // FIX: Remove problematic type assertion `as unknown as Timer` which was causing type inference issues.
+        // FIX: Resolved TypeScript errors related to timer refs by ensuring consistent and correct typing.
         closeChatTimerRef.current = window.setTimeout(() => { if (document.visibilityState === 'visible') setIsChatOpen(false); }, 90000);
     }; 
     if (isChatOpen) { 

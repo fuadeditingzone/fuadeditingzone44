@@ -46,6 +46,7 @@ export interface ChatMessage {
 export interface User {
   username: string;
   name: string;
+  email: string;
   profession: string;
   role: 'client' | 'designer';
   bio: string;
