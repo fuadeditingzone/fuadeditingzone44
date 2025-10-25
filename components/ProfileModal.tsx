@@ -48,15 +48,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => 
                           <p>{user.bio}</p>
                       </div>
                     )}
-
-                    <div className="mt-6 border-t border-gray-700 pt-4 flex flex-wrap justify-center items-center gap-x-3 gap-y-2 text-sm">
-                        <span className="text-gray-300 font-medium">Connect with Fuad:</span>
-                        {SOCIAL_LINKS.map((link, index) => (
-                          <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="text-red-400 hover:text-red-300 transition-colors font-medium">
-                            {link.name}
-                          </a>
-                        ))}
-                    </div>
                 </div>
             </div>
         </div>
