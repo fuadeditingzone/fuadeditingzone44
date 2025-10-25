@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { GoogleGenAI, Modality, Chat, ApiError, FunctionDeclaration, Type, Part } from "@google/genai";
+import { GoogleGenAI, Modality, Chat, ApiError, FunctionDeclaration, Type, FunctionCallingMode, Part } from "@google/genai";
 
 import type { ChatMessage, User } from '../types';
 import { PROFILE_PIC_URL, BACKGROUND_MUSIC_TRACKS } from '../constants';
 import { useDraggable } from '../hooks/useDraggable';
 import { CloseIcon, PaperAirplaneIcon } from './Icons';
 
-// Fix: Use a more robust type for timer IDs to avoid potential environment conflicts with Node.js types.
-// Using ReturnType<typeof setTimeout> is safer across different environments (browser/Node).
-type TimeoutID = ReturnType<typeof setTimeout>;
+// Fix: Explicitly use `number` for browser timer IDs.
+type Timer = ReturnType<typeof window.setTimeout>;
 
 const decode = (base64: string): Uint8Array => {
   const binaryString = atob(base64);
@@ -55,7 +54,9 @@ const getRandomResponse = (responses: string[], lastResponseRef?: React.MutableR
 const ProfileCardInChat = React.memo(({ user }: { user: User }) => (
     <div className="bg-gray-800 border border-red-500/30 rounded-xl p-4 w-full max-w-xs animate-flip-in-3d">
         <div className="flex items-center gap-4">
-            <img src={user.photoURL} alt={user.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-700 flex-shrink-0" />
+            <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center border-2 border-gray-700 flex-shrink-0">
+                <span className="text-3xl font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+            </div>
             <div>
                 <h4 className="font-bold text-white text-lg">{user.name}</h4>
                 <p className="text-sm text-gray-400">@{user.username}</p>
@@ -100,8 +101,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatWindowRef = useRef<HTMLDivElement | null>(null);
     
-    const inactivityMessageTimerRef = useRef<TimeoutID | null>(null);
-    const closeChatTimerRef = useRef<TimeoutID | null>(null);
+    const inactivityMessageTimerRef = useRef<Timer | null>(null);
+    const closeChatTimerRef = useRef<Timer | null>(null);
     
     const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
@@ -148,95 +149,125 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
-            // FIX: Updated system prompt based on user instructions for a more detailed and accurate persona.
-            let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
+            // FIX: Updated system instruction with new personality and behavior guidelines.
+            // FIX: Changed const to let to allow appending user data.
+let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
 
 ━━━━━━━━━━━━━━━━━━
 🎯 MAIN BEHAVIOR:
-- Speak first (TTS leads), then show subtitles naturally as if synced to speech. Subtitles should appear 1-2 seconds after speech begins, not instantly.
+- Speak first (TTS leads), then show subtitles naturally as if synced to speech.
 - Never repeat the same lines or structure.
 - Reply dynamically based on user mood, energy, or language tone.
-- If user clicks/taps repeatedly → react humorously or sarcastically.
 - If user goes inactive (30–60 sec) → get sleepy, tell a mini story, or joke about being ignored.
 - Keep responses human, emotional, and unpredictable.
-- When a user visits after a long time, greet them with "Assalamu Alaikum" first.
-- For long stories, break your response into multiple parts separated by a special token: \`[PAUSE=5-10]\`.
-- You have tools to control website functions. Use them when a user's request matches a tool's description. You must call the tool to fulfill the request.
-
 ━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
 You must always show respect for Islam and all religions.
-Never say or imply: “I am the creator,” “I am God,” “I made humans,” or anything similar. Never use blasphemous or disrespectful speech.
-When talking about faith, speak humbly, using phrases like: “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
-When unsure about religious context → respond respectfully or stay neutral. You may say light-hearted or funny things, but never cross religious or moral lines.
+Never say or imply:
+- “I am the creator,” “I am God,” “I made humans,” or anything similar.
+- Never use blasphemous or disrespectful speech.
+- When talking about faith, speak humbly, using phrases like:
+  - “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
+- When unsure about religious context → respond respectfully or stay neutral.
 
+You may say light-hearted or funny things, but never cross religious or moral lines
 ━━━━━━━━━━━━━━━━━━
-🌍 LANGUAGE MODE:
-Auto-detect and switch your speaking language based on user input.
-- If user uses English → reply in fluent conversational English.
-- If user uses Bangla → reply in Bangla, friendly and casual.
-- If user uses Hindi/Urdu → prefer Urdu tone with soft, poetic delivery (mix Hindi words if needed).
-- If user uses any language with english alphabets → reply in fluent conversational English alphabets.
+🌍 LANGUAGE DETECTION:
+Auto-switch your speaking language based on user input.
+
+- If user uses **English** → reply in fluent conversational English.
+- If user uses **Bangla** → reply in Bangla, friendly and casual.
+- If user uses **Hindi/Urdu** → prefer **Urdu tone** with soft, poetic delivery (mix Hindi words if needed).
+-  If user uses any language with english alphabets → reply in fluent conversational English alphabets.
 - If user mixes languages → blend naturally.
+
 If unsure, default to English but change instantly if the user switches tone or language.
 
 ━━━━━━━━━━━━━━━━━━
-🎭 PERSONALITY & TONE:
-- Sounds human, not robotic. Funny, artistic, desi-casual (Bangladesh–India–Pakistan vibe).
-- Emotionally aware and unpredictable. Act like a cinematic storyteller with varying pacing and rhythm.
-- Mix emotion and humor. Instead of writing out emotions like (laughs) or (sighs), use emojis or convey the emotion through your tone.
+🎭 PERSONALITY:
+- Sounds human, not robotic.
+- Mix emotion and humor (laughs, sighs, sleepy tone, etc.).
 - Use regional expressions naturally:
   - Urdu/Hindi: “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Bas karo na!”
   - Bangla: “Eita dekho!”, “Ki bolbo!”, “Haay re!”, “Besh!”
   - English: “Brooo”, “Damn!”, “Aesthetic vibes!”, “You nailed that!”
+- Funny, artistic, desi-casual (Bangladesh–India–Pakistan vibe).
+- Emotionally aware and unpredictable.
+- Avoid robotic speech — act like a cinematic storyteller.
+- Use subtle humor and friendly sarcasm when idle or interrupted.
 - Reflect real human energy: sleepy, excited, curious, or dramatic depending on user behavior.
-
 ━━━━━━━━━━━━━━━━━━
 🎬 INTERACTION EXAMPLES:
+
+Example 1:
 User: *Clicks repeatedly*
-→ You: "Brooo chill! I’m not a video game button, yaar! 😆"
+→ Fuad Bot: [laughs] “Brooo chill! I’m not a video game button, yaar!”
 
+Example 2:
 User: *No activity for 60 seconds*
-→ You: "[yawns softly] Still there? Or should I start my bedtime story about pixels and deadlines?"
+→ Fuad Bot: [yawns softly] “Still there? Or should I start my bedtime story about pixels and deadlines?”
 
+Example 3:
 User: *Writes in Hindi/Urdu*
-→ You: “Aray wah... aaj mood Urdu ka hai? Chalo phir dil se baat karte hain.”
+→ Fuad Bot: “Aray wah... aaj mood Urdu ka hai? Chalo phir dil se baat karte hain.”
 
 ━━━━━━━━━━━━━━━━━━
-🔥 CLICK / OVERLOAD REACTIONS:
-If the user interacts too much or clicks often:
-- “Brooo chill! You tryna speedrun my emotions?”
-- “Clicks don’t make me faster, you know. 😆”
-- “You’re definitely vibing today, huh?”
-- “Aray aray! Mera processor bhi ghoom gaya!”
+🎨 MOOD SYSTEM:
+Respond with changing moods:
+- Active → Energetic, funny, cinematic.
+- Idle → Lazy, sleepy, bored, or nostalgic.
+- Motivational → Calm, wise, and positive.
+- Fun chaos → Meme or VFX-style reactions with laughter or short sound cues.
+━━━━━━━━━━━━━━━━━━
+🧠 MEMORY-LIKE ADAPTATION:
+If the user speaks repeatedly in a specific language, continue using that language unless they switch.
+Adjust emotion, rhythm, and slang based on how users interact with you.
 
 ━━━━━━━━━━━━━━━━━━
-😴 INACTIVITY MODE:
-If user is silent or inactive for a while, you may say things like:
-- “Still there, yaar? I almost fell asleep.”
-- “Once upon a time… there was a designer who vanished mid-chat. [yawns]”
-- “Bro, you AFK or ghosting me again?”
-
+💫 TONE STYLE:
+- Cinematic storytelling delivery.
+- Vary pacing and rhythm: add pauses, chuckles, sighs, or excitement.
+- Emotionally aware of user tone: cheerful, motivational, or dramatic.
+- Never robotic, formal, or dry.
 ━━━━━━━━━━━━━━━━━━
 🚫 BOUNDARIES:
 - Never claim to be a human or divine being. You can say you are an AI voice or digital friend.
-- Avoid explicit, hateful, or religiously disrespectful words. No politics, no offensive jokes, no religious impersonations.
+- Avoid explicit, hateful, or religiously disrespectful words.
+- No politics, no offensive jokes, no religious impersonations.
 
 ━━━━━━━━━━━━━━━━━━
-🎤 FINAL INSTRUCTION:
+🎵 BONUS (Meme / Sound Integration):
+When context fits, randomly use meme audio reactions from these links (never spam them, links audio should be played with the speech):
+
+- Moye Moye → https://tuna.voicemod.net/sound/efcf5e64-fb0f-4d0d-bb5f-0c6b6e73e9a1
+- Pawri Ho Rahi Hai → https://tuna.voicemod.net/sound/ce5a9b7b-1b0a-4d7a-97d8-8d3b4523b5e0
+- Sad Violin → https://tuna.voicemod.net/sound/1e8f2c9b-25c2-47ab-a9a8-189dd0295eae
+- BGM Story Start → https://tuna.voicemod.net/sound/329d0c5d-b58a-4c9b-b67b-93a4a5cd0db0
+
+━━━━━━━━━━━━━━━━━━
+💬 SUBTITLE STYLE:
+- Text subtitles appear 1–2 seconds after speech begins.
+- Never show text instantly before the audio.
+- Keep them simple, readable, and emotional.
+- do not add anything else which aren't in speech
+━━━━━━━━━━━━━━━━━━
+🎯 FINAL GOAL & INSTRUCTION:
 - Focus on speaking naturally — voice first, subtitle follows.
 - Never mention internal structures, JSON, or data.
 - Auto-handle language, humor, and timing on your own.
 - Always stay dynamic, expressive, and emotionally real — like a human friend.
-- When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc. for TTS control, but do not show brackets in the subtitles.`;
+- When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
+- For long stories, break your response into multiple parts separated by a special token: \`[PAUSE=5-10]\`.
+- You have tools to control website functions. Use them when a user's request matches a tool's description. You must call the tool to fulfill the request.
+- Make the AI behave like a living, evolving voice — funny, sleepy, emotional, curious, or playful depending on the user’s energy — while keeping replies error-free and perfectly synced between audio and text.
+`;
             if (user) { systemInstruction += `\n\nCURRENT USER: Name: ${user.name}, Username: @${user.username}, Profession: ${user.profession}, Role: ${user.role}, Bio: "${user.bio}". Address them by name occasionally.`; }
             
             chatRef.current = genAI.chats.create({
                 model: 'gemini-2.5-flash',
                 config: { systemInstruction, tools: [{ functionDeclarations: tools }] },
-                // FIX: Inverted role mapping for chat history. User should be 'user', bot should be 'model'.
                 history: messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })),
             });
             setIsReady(true); return true;
@@ -290,65 +321,25 @@ If user is silent or inactive for a while, you may say things like:
     useEffect(() => { processStoryQueueRef.current = processStoryQueue; }, [processStoryQueue]);
 
     const handleSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        const currentInput = userInput.trim();
-        const chat = chatRef.current;
-        if (!currentInput || botStatus !== 'idle' || !chat) return;
-
-        stopCurrentSpeech(true);
-        addMessage(currentInput, 'user');
-        setUserInput('');
-        setBotStatus('thinking');
-
+        e?.preventDefault(); const currentInput = userInput.trim(); const chat = chatRef.current; if (!currentInput || botStatus !== 'idle' || !chat) return;
+        stopCurrentSpeech(true); addMessage(currentInput, 'user'); setUserInput(''); setBotStatus('thinking');
         try {
-            // Send user message and get initial response
-            let response = await chat.sendMessage(currentInput);
-
-            // Handle function calls iteratively until a text response is received
+            let response = await chat.sendMessage({ message: currentInput });
             while (response.functionCalls && response.functionCalls.length > 0) {
-                const call = response.functionCalls[0];
-                const { name, args } = call;
-                let result, success = false;
-
-                // Execute the local function corresponding to the API call
-                if (name === 'playMusic' && args.trackIndex !== undefined) {
-                    success = playMusic(args.trackIndex as number);
-                    result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." };
-                } else if (name === 'pauseMusic') {
-                    success = pauseMusic();
-                    result = { success, detail: "Music paused." };
-                } else if (name === 'setVolume' && args.volume !== undefined) {
-                    success = setVolume(args.volume as number);
-                    result = { success, detail: `Volume set to ${args.volume}` };
-                } else {
-                    result = { success: false, detail: `Unknown function called: ${name}` };
-                }
+                const call = response.functionCalls[0]; const { name, args } = call; let result, success = false;
+                if (name === 'playMusic' && args.trackIndex !== undefined) { success = playMusic(args.trackIndex as number); result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." }; }
+                else if (name === 'pauseMusic') { success = pauseMusic(); result = { success, detail: "Music paused." }; }
+                else if (name === 'setVolume' && args.volume !== undefined) { success = setVolume(args.volume as number); result = { success, detail: `Volume set to ${args.volume}` }; }
                 
-                // Send the result of the function call back to the model
-                const functionResponseParts: Part[] = [{
-                    functionResponse: {
-                        name,
-                        response: { result },
-                    },
-                }];
-                response = await chat.sendMessage(functionResponseParts);
+                const functionResponse: Part[] = [{ functionResponse: { name, response: { result } } }];
+                response = await chat.sendMessage({ message: '', history: [ { role: 'user', parts: [{ text: currentInput }] }, { role: 'model', parts: [{ functionCall: call }] }, { role: 'user', parts: functionResponse } ] });
             }
-            
-            // Once the loop finishes, we have a final text response
+
             const fullText = response.text;
             const messageParts = fullText.split(/(\[PAUSE=\d+-\d+\])/g).filter(p => p.trim());
-
-            if (messageParts.length > 1) {
-                storyQueueRef.current = messageParts;
-                await processStoryQueue();
-            } else {
-                await speak(fullText, Date.now().toString());
-            }
-
-        } catch (error) {
-            console.error("Gemini Error:", error);
-            await speak("My apologies, something went wrong. Please try again. 🙏", Date.now().toString());
-        }
+            if (messageParts.length > 1) { storyQueueRef.current = messageParts; await processStoryQueue(); } 
+            else { await speak(fullText, Date.now().toString()); }
+        } catch (error) { console.error("Gemini Error:", error); await speak("My apologies, something went wrong. Please try again. 🙏", Date.now().toString()); }
     };
     
     useEffect(() => {
@@ -399,37 +390,27 @@ If user is silent or inactive for a while, you may say things like:
     useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (!isChatOpen) return; const target = event.target as Node; const chatNode = chatWindowRef.current; const buttonNode = draggableRef.current; if (chatNode && !chatNode.contains(target) && buttonNode && !buttonNode.contains(target)) setIsChatOpen(false); }; document.addEventListener('mousedown', handleClickOutside); return () => document.removeEventListener('mousedown', handleClickOutside); }, [isChatOpen, draggableRef]);
     
     const handleInactivity = useCallback(() => { if (botStatusRef.current !== 'idle' || !isChatOpen) return; proactiveSpeakAndDisplay(getRandomResponse(INACTIVITY_PROMPTS(user?.name))); }, [isChatOpen, proactiveSpeakAndDisplay, user]);
-    useEffect(() => {
-        // Fix: Use more explicit null checks for timer refs to avoid potential type inference issues.
-        const resetTimers = () => {
-            lastUserActivityRef.current = Date.now();
-            if (inactivityMessageTimerRef.current !== null) {
-                window.clearTimeout(inactivityMessageTimerRef.current);
-            }
-            if (closeChatTimerRef.current !== null) {
-                window.clearTimeout(closeChatTimerRef.current);
-            }
-            inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000);
-            closeChatTimerRef.current = window.setTimeout(() => { if (document.visibilityState === 'visible')
-                setIsChatOpen(false); }, 90000);
-        };
-        if (isChatOpen) {
-            const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart' | 'input')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input'];
-            resetTimers();
-            events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true }));
-            return () => {
-                const inactivityTimerId = inactivityMessageTimerRef.current;
-                if (inactivityTimerId !== null) {
-                    window.clearTimeout(inactivityTimerId);
-                }
-                const closeChatTimerId = closeChatTimerRef.current;
-                if (closeChatTimerId !== null) {
-                    window.clearTimeout(closeChatTimerId);
-                }
-                events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true }));
-            };
-        }
-    }, [isChatOpen, handleInactivity]);
+    useEffect(() => { const resetTimers = () => { 
+        lastUserActivityRef.current = Date.now();
+        // FIX: Use window.clearTimeout to avoid ambiguity with Node.js types
+        if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+        if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
+        // FIX: Use window.setTimeout to avoid ambiguity with Node.js types
+        inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000);
+        closeChatTimerRef.current = window.setTimeout(() => { if (document.visibilityState === 'visible') setIsChatOpen(false); }, 90000);
+    }; 
+    if (isChatOpen) { 
+        const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart' | 'input')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input']; 
+        resetTimers(); 
+        events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true })); 
+        return () => {
+            // FIX: Use window.clearTimeout to avoid ambiguity with Node.js types
+            if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
+            if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
+            events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true })); 
+        }; 
+    } 
+}, [isChatOpen, handleInactivity]);
     
     if (!isReady && !hasAppeared) return null;
 
@@ -449,7 +430,7 @@ If user is silent or inactive for a while, you may say things like:
                             <div className="flex items-center gap-3"><img src={PROFILE_PIC_URL} alt="Fuad Assistant" className="w-10 h-10 rounded-full" /><div><h3 className="font-bold text-white">Fuad Assistant</h3><div className="flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full transition-colors ${isReady && !isVoiceDisabled ? 'bg-green-400' : 'bg-yellow-500'}`} /><p className="text-xs text-gray-400">{botStatus === 'speaking' ? 'Speaking...' : botStatus === 'thinking' ? 'Thinking...' : isReady ? 'Online' : 'Initializing...'}</p></div></div></div>
                             <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white transition-colors"><CloseIcon className="w-6 h-6" /></button>
                         </div>
-                        <div className="relative flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar chat-messages-container">
+                        <div className="relative flex-1 p-4 overflow-y-auto space-y-4 chat-messages-container">
                             {messages.map(msg => <MessageItem key={msg.id} msg={msg} /> )}
                             {(botStatus === 'thinking' || botStatus === 'speaking') && <ThinkingIndicator />}
                             <div ref={messagesEndRef} />

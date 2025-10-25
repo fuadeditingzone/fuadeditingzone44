@@ -6,23 +6,33 @@ import { ProfileMenu } from './ProfileMenu';
 
 interface HeaderProps {
   onScrollTo: (section: 'home' | 'portfolio' | 'contact' | 'about') => void;
+  onLoginClick: () => void;
   onViewProfile: (user: User) => void;
-  onEditProfile: () => void;
+  onSearch: (query: string) => void;
   isReflecting: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onScrollTo, onViewProfile, onEditProfile, isReflecting }) => {
-  const { currentUser, login, logout } = useUser();
+export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onViewProfile, onSearch, isReflecting }) => {
+  const { currentUser, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoAnimating, setIsLogoAnimating] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (isSearchOpen && searchRef.current) {
+      searchRef.current.focus();
+    }
+  }, [isSearchOpen]);
   
   const triggerLogoAnimation = useCallback(() => {
     if (isLogoAnimating) return;
@@ -38,6 +48,15 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onViewProfile, onEdi
   const handleLogoClick = () => {
     triggerLogoAnimation();
     onScrollTo('home');
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      onSearch(searchQuery.trim());
+      setIsSearchOpen(false);
+      setSearchQuery('');
+    }
   };
 
   const NavLink: React.FC<{ section: 'home' | 'portfolio' | 'contact' | 'about', children: React.ReactNode }> = ({ section, children }) => (
@@ -74,12 +93,33 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onViewProfile, onEdi
             
             <div className="flex items-center gap-4 ml-4">
               <div className="relative">
+                <button onClick={() => setIsSearchOpen(prev => !prev)} className="text-gray-300 hover:text-white transition-colors" aria-label="Search users">
+                  <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                </button>
+                {isSearchOpen && (
+                  <form onSubmit={handleSearchSubmit} className="absolute top-full right-0 mt-2 animate-fade-in">
+                    <input
+                      ref={searchRef}
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search username..."
+                      className="bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all w-48"
+                      onBlur={() => { if(!searchQuery) setIsSearchOpen(false); }}
+                    />
+                  </form>
+                )}
+              </div>
+
+              <div className="relative">
                 {currentUser ? (
                   <button onClick={() => setIsProfileMenuOpen(p => !p)} className="flex-shrink-0" aria-label="Open profile menu">
-                    <img src={currentUser.photoURL} alt={currentUser.name} className="w-12 h-12 rounded-full object-cover border-2 border-gray-600 hover:border-red-500 transition-all duration-300 glow-shadow-sm transform hover:scale-110" />
+                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center border-2 border-gray-600 hover:border-red-500 transition-all duration-300 glow-shadow-sm transform hover:scale-110">
+                      <span className="text-xl font-bold text-white">{currentUser.name.charAt(0).toUpperCase()}</span>
+                    </div>
                   </button>
                 ) : (
-                  <button onClick={login} className="hidden md:block bg-red-600 text-white font-bold py-2 px-5 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 btn-glow">
+                  <button onClick={onLoginClick} className="hidden md:block bg-red-600 text-white font-bold py-2 px-5 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 btn-glow">
                       Login
                   </button>
                 )}
@@ -88,7 +128,6 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onViewProfile, onEdi
                     onClose={() => setIsProfileMenuOpen(false)}
                     onLogout={logout}
                     onViewProfile={() => onViewProfile(currentUser)}
-                    onEditProfile={() => onEditProfile()}
                   />
                 )}
               </div>
@@ -108,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onViewProfile, onEdi
             <NavLink section="about">About</NavLink>
             <NavLink section="contact">Contact</NavLink>
             {!currentUser && (
-              <button onClick={() => { login(); setIsMenuOpen(false); }} className="text-gray-300 hover:text-white transition-colors duration-300 text-lg">Login</button>
+              <button onClick={() => { onLoginClick(); setIsMenuOpen(false); }} className="text-gray-300 hover:text-white transition-colors duration-300 text-lg">Login</button>
             )}
           </div>
       )}

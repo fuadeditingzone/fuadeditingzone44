@@ -1,151 +1,117 @@
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import type { User } from '../types';
-import { auth, db, storage, firebaseInitialized } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface UserContextType {
     currentUser: User | null;
-    isAuthLoading: boolean;
-    isProfileCreationRequired: boolean;
-    login: () => void;
+    isLocked: boolean;
+    register: (userData: User) => User | null;
     logout: () => void;
-    register: (profileData: Omit<User, 'uid' | 'email' | 'photoURL'>, photoFile?: File) => Promise<User | null>;
-    updateUser: (updatedData: Partial<User>) => Promise<boolean>;
-    isUsernameTaken: (username: string) => Promise<boolean>;
+    lockSite: () => void;
+    isUsernameTaken: (username: string) => boolean;
+    findUsers: (query: string) => User[];
+    getUserByUsername: (username: string) => User | undefined;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-    const [isAuthLoading, setIsAuthLoading] = useState(true);
-    const [isProfileCreationRequired, setIsProfileCreationRequired] = useState(false);
+const USER_DB_KEY = 'portfolioUserDatabase';
+const CURRENT_USER_KEY = 'portfolioCurrentUser';
 
-    const checkUserProfile = useCallback(async (user: FirebaseUser) => {
-        if (!db) return;
-        const userRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userRef);
-        if (docSnap.exists()) {
-            setCurrentUser(docSnap.data() as User);
-            setIsProfileCreationRequired(false);
-        } else {
-            setCurrentUser(null);
-            setIsProfileCreationRequired(true);
-        }
-    }, []);
+export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [users, setUsers] = useState<Record<string, User>>({});
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [isLocked, setIsLocked] = useState(false);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     useEffect(() => {
-        if (!firebaseInitialized || !auth) {
-            setIsAuthLoading(false);
-            return;
-        }
-
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                setFirebaseUser(user);
-                await checkUserProfile(user);
-            } else {
-                setFirebaseUser(null);
-                setCurrentUser(null);
-                setIsProfileCreationRequired(false);
+        try {
+            const storedUsers = localStorage.getItem(USER_DB_KEY);
+            const storedCurrentUser = localStorage.getItem(CURRENT_USER_KEY);
+            
+            if (storedUsers) {
+                setUsers(JSON.parse(storedUsers));
             }
-            setIsAuthLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [checkUserProfile]);
-
-    const login = useCallback(async () => {
-        if (!auth) return;
-        const provider = new GoogleAuthProvider();
-        try {
-            await signInWithPopup(auth, provider);
-            // onAuthStateChanged will handle the successful login
+            if (storedCurrentUser) {
+                setCurrentUser(JSON.parse(storedCurrentUser));
+            }
         } catch (error) {
-            console.error("Error during Google sign-in:", error);
-            // Handle specific errors like popup blocked by browser
+            console.error("Failed to load user data from local storage:", error);
         }
+        setIsInitialized(true);
     }, []);
 
-    const logout = useCallback(async () => {
-        if (!auth) return;
+    const persistUsers = (updatedUsers: Record<string, User>) => {
         try {
-            await signOut(auth);
-            setCurrentUser(null);
-            setFirebaseUser(null);
+            localStorage.setItem(USER_DB_KEY, JSON.stringify(updatedUsers));
         } catch (error) {
-            console.error("Error signing out: ", error);
+            console.error("Failed to save user database to local storage:", error);
         }
-    }, []);
+    };
 
-    const isUsernameTaken = useCallback(async (username: string): Promise<boolean> => {
-        if (!db) return false;
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("username", "==", username.toLowerCase()));
-        const querySnapshot = await getDocs(q);
-        return !querySnapshot.empty;
-    }, []);
-    
-    const register = useCallback(async (profileData: Omit<User, 'uid'|'email'|'photoURL'>, photoFile?: File): Promise<User | null> => {
-        if (!db || !firebaseUser) return null;
-
-        let photoURL = firebaseUser.photoURL || '';
-        if (photoFile && storage) {
-            const storageRef = ref(storage, `profile-pictures/${firebaseUser.uid}`);
-            await uploadBytes(storageRef, photoFile);
-            photoURL = await getDownloadURL(storageRef);
-        }
-
-        const now = Date.now();
-        const newUser: User = {
-            ...profileData,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            photoURL: photoURL,
-            username: profileData.username.toLowerCase(),
-            profileLastUpdatedAt: now,
-            usernameLastUpdatedAt: now,
-        };
-
+    const persistCurrentUser = (user: User | null) => {
         try {
-            await setDoc(doc(db, "users", firebaseUser.uid), newUser);
-            setCurrentUser(newUser);
-            setIsProfileCreationRequired(false);
-            return newUser;
+            if (user) {
+                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+            } else {
+                localStorage.removeItem(CURRENT_USER_KEY);
+            }
         } catch (error) {
-            console.error("Error creating profile:", error);
+            console.error("Failed to save current user to local storage:", error);
+        }
+    }
+
+    const isUsernameTaken = useCallback((username: string) => {
+        return !!users[username.toLowerCase()];
+    }, [users]);
+
+    const register = useCallback((userData: User): User | null => {
+        const usernameLower = userData.username.toLowerCase();
+        if (isUsernameTaken(usernameLower)) {
             return null;
         }
-    }, [firebaseUser]);
+        const updatedUsers = { ...users, [usernameLower]: userData };
+        setUsers(updatedUsers);
+        setCurrentUser(userData);
+        persistUsers(updatedUsers);
+        persistCurrentUser(userData);
+        setIsLocked(false);
+        return userData;
+    }, [users, isUsernameTaken]);
 
-    const updateUser = useCallback(async (updatedData: Partial<User>): Promise<boolean> => {
-        if (!db || !currentUser) return false;
-        
-        const userRef = doc(db, "users", currentUser.uid);
-        
-        try {
-            await updateDoc(userRef, updatedData);
-            setCurrentUser(prev => prev ? { ...prev, ...updatedData } : null);
-            return true;
-        } catch (error) {
-            console.error("Error updating profile:", error);
-            return false;
+    const logout = useCallback(() => {
+        setCurrentUser(null);
+        persistCurrentUser(null);
+    }, []);
+
+    const lockSite = useCallback(() => {
+        if (!currentUser) {
+            setIsLocked(true);
         }
     }, [currentUser]);
 
+    const findUsers = useCallback((query: string) => {
+        if (!query) return [];
+        const queryLower = query.toLowerCase();
+        return Object.values(users).filter((user: User) => 
+            user.username.toLowerCase().includes(queryLower) ||
+            user.name.toLowerCase().includes(queryLower)
+        );
+    }, [users]);
+
+    const getUserByUsername = useCallback((username: string) => {
+        return users[username.toLowerCase()];
+    }, [users]);
+
     const value = useMemo(() => ({
         currentUser,
-        isAuthLoading,
-        isProfileCreationRequired,
-        login,
-        logout,
+        isLocked: isInitialized && isLocked && !currentUser,
         register,
-        updateUser,
+        logout,
+        lockSite,
         isUsernameTaken,
-    }), [currentUser, isAuthLoading, isProfileCreationRequired, login, logout, register, updateUser, isUsernameTaken]);
+        findUsers,
+        getUserByUsername
+    }), [currentUser, isLocked, register, logout, lockSite, isUsernameTaken, findUsers, getUserByUsername, isInitialized]);
 
     return (
         <UserContext.Provider value={value}>

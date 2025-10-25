@@ -4,10 +4,9 @@ interface ProfileMenuProps {
     onClose: () => void;
     onLogout: () => void;
     onViewProfile: () => void;
-    onEditProfile: () => void;
 }
 
-export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onClose, onLogout, onViewProfile, onEditProfile }) => {
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onClose, onLogout, onViewProfile }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -32,12 +31,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onClose, onLogout, onV
                     className="group w-full flex items-center text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-red-500/20 hover:text-white transition-all duration-200"
                 >
                     View My Profile
-                </button>
-                <button
-                    onClick={() => { onEditProfile(); onClose(); }}
-                    className="group w-full flex items-center text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-red-500/20 hover:text-white transition-all duration-200"
-                >
-                    Edit Profile
                 </button>
                 <button
                     onClick={() => { onLogout(); onClose(); }}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { LOGO_URL } from '../constants';
@@ -28,21 +28,17 @@ const benefits = [
 const professionTags = ["Graphic Designer", "Video Editor", "Developer", "Content Creator", "Student", "Art Director"];
 
 interface LoginModalProps {
+    onClose: () => void;
     onRegisterSuccess: (user: User) => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ onRegisterSuccess }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSuccess }) => {
     const { register, isUsernameTaken } = useUser();
-    const [formData, setFormData] = useState<Omit<User, 'bio' | 'uid' | 'email' | 'photoURL'>>({
+    const [formData, setFormData] = useState<Omit<User, 'bio'>>({
         username: '', name: '', profession: '', role: 'client',
     });
     const [bio, setBio] = useState('');
-    const [photoFile, setPhotoFile] = useState<File | null>(null);
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -51,41 +47,30 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onRegisterSuccess }) => 
         else { setFormData({ ...formData, [name]: value }); }
     };
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setPhotoFile(file);
-            setPhotoPreview(URL.createObjectURL(file));
-        }
-    };
-
     const handleProfessionTagClick = (profession: string) => {
         setFormData({ ...formData, profession });
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
-        if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) { setError('Please fill in all required fields.'); setIsLoading(false); return; }
-        if (await isUsernameTaken(formData.username)) { setError('This username is already taken. Please choose another.'); setIsLoading(false); return; }
-        
+        if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) { setError('Please fill in all required fields.'); return; }
+        if (isUsernameTaken(formData.username)) { setError('This username is already taken. Please choose another.'); return; }
         setError('');
-        const newUser = await register({ ...formData, bio }, photoFile || undefined);
-        setIsLoading(false);
-
+        const newUser = register({ ...formData, bio });
         if (newUser) {
             onRegisterSuccess(newUser);
+            onClose();
         } else {
             setError('An unexpected error occurred. Please try again.');
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 animate-fade-in">
-            <div className="perspective w-full max-w-4xl">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div className="perspective w-full max-w-4xl" onClick={e => e.stopPropagation()}>
                 <div className="relative bg-gray-900/80 backdrop-blur-lg border border-red-500/30 rounded-2xl shadow-2xl shadow-red-500/20 transform-style-3d animate-flip-in-3d flex flex-col md:flex-row overflow-hidden">
                     {/* Benefits Panel */}
-                    <div className="w-full md:w-2/5 bg-black/30 p-8 flex-col justify-center hidden md:flex">
+                    <div className="w-full md:w-2/5 bg-black/30 p-8 flex flex-col justify-center">
                         <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mb-6" />
                         <h2 id="login-title" className="text-2xl font-bold text-white mb-4">Unlock the Full Experience</h2>
                         <ul className="space-y-4 text-left">
@@ -101,22 +86,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onRegisterSuccess }) => 
                         </ul>
                     </div>
                     {/* Form Panel */}
-                    <div className="w-full md:w-3/5 p-8 overflow-y-auto max-h-[90vh] custom-scrollbar">
+                    <div className="w-full md:w-3/5 p-8">
                         <h2 className="text-2xl font-bold text-white mb-2 text-center md:text-left">Create your Profile</h2>
-                        <p className="text-gray-400 mb-6 text-center md:text-left">Complete your registration to continue.</p>
+                        <p className="text-gray-400 mb-6 text-center md:text-left">It's free and only takes a minute.</p>
                         <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                            <div className="flex flex-col items-center gap-4">
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="relative w-24 h-24 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-400 hover:border-red-500 hover:text-white transition-colors">
-                                    {photoPreview ? (
-                                        <img src={photoPreview} alt="Profile preview" className="w-full h-full object-cover rounded-full" />
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" /></svg>
-                                    )}
-                                </button>
-                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-                                <p className="text-xs text-gray-500">Upload a profile picture (optional)</p>
-                            </div>
-
                             <div>
                                 <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">Username</label>
                                 <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-red-500 transition-all">
@@ -145,9 +118,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onRegisterSuccess }) => 
                                 </div>
                             </div>
                             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-                            <button type="submit" disabled={isLoading} className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2 disabled:bg-gray-600 disabled:cursor-not-allowed">
-                                {isLoading ? 'Creating...' : 'Create Profile'}
-                            </button>
+                            <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2">Create Profile</button>
                         </form>
                     </div>
                 </div>
