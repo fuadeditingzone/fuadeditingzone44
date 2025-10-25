@@ -7,10 +7,10 @@ const firebaseConfig = {
   apiKey: "AIzaSyCA_nAtmaN9Bs7a5q-c9za5eSMnk0Ys5Xs",
   authDomain: "fuad-editing-zone.firebaseapp.com",
   projectId: "fuad-editing-zone",
-  storageBucket: "fuad-editing-zone.firebasestorage.app",
+  storageBucket: "fuad-editing-zone.appspot.com",
   messagingSenderId: "832389657221",
-  appId: "1:832389657221:web:6e731b9a922c429b376fec",
-  measurementId: "G-2QT4XLSNDQ"
+  appId: "1:832389657221:web:6799c059e1efc703376fec",
+  measurementId: "G-EMBJ7X4FBW"
 };
 
 const app = initializeApp(firebaseConfig);

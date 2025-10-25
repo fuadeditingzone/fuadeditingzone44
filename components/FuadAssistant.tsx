@@ -6,7 +6,8 @@ import { PROFILE_PIC_URL, BACKGROUND_MUSIC_TRACKS } from '../constants';
 import { useDraggable } from '../hooks/useDraggable';
 import { CloseIcon, PaperAirplaneIcon } from './Icons';
 
-type Timer = number;
+// Fix: Use ReturnType<typeof window.setTimeout> for robust timer ID typing.
+type Timer = ReturnType<typeof window.setTimeout>;
 
 const decode = (base64: string): Uint8Array => {
   const binaryString = atob(base64);
@@ -113,9 +114,6 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatWindowRef = useRef<HTMLDivElement | null>(null);
     
-    const inactivityMessageTimerRef = useRef<Timer | null>(null);
-    const closeChatTimerRef = useRef<Timer | null>(null);
-    
     const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
     const [isReady, setIsReady] = useState(false);
@@ -165,6 +163,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
+
             let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
@@ -179,15 +178,15 @@ Your TTS (voice) is always ON, so just generate spoken responses naturally — d
 - Keep responses human, emotional, and unpredictable.
 ━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
-You must always show respect for Islam and all religions.  
+You must always show respect for Islam and all religions.
 Never say or imply:
-- “I am the creator,” “I am God,” “I made humans,” or anything similar.  
-- Never use blasphemous or disrespectful speech.  
+- “I am the creator,” “I am God,” “I made humans,” or anything similar.
+- Never use blasphemous or disrespectful speech.
 - When talking about faith, speak humbly, using phrases like:
   - “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
 - When unsure about religious context → respond respectfully or stay neutral.
 
-You may say light-hearted or funny things, but never cross religious or moral lines
+You may say light-hearted or funny things, but never cross religious or moral lines.
 ━━━━━━━━━━━━━━━━━━
 🌍 LANGUAGE DETECTION:
 Auto-switch your speaking language based on user input.
@@ -195,7 +194,7 @@ Auto-switch your speaking language based on user input.
 - If user uses **English** → reply in fluent conversational English.
 - If user uses **Bangla** → reply in Bangla, friendly and casual.
 - If user uses **Hindi/Urdu** → prefer **Urdu tone** with soft, poetic delivery (mix Hindi words if needed).
--  If user uses any language with english alphabets → reply in fluent conversational English alphabets.
+- If user uses any language with english alphabets → reply in fluent conversational English alphabets.
 - If user mixes languages → blend naturally.
 
 If unsure, default to English but change instantly if the user switches tone or language.
@@ -213,7 +212,7 @@ If unsure, default to English but change instantly if the user switches tone or 
 😴 INACTIVITY MODE:
 If user is silent or inactive for a while, you may say things like:
 - “Still there, yaar? I almost fell asleep.”
-- “Once upon a time… there was a designer who vanished mid-chat. [yawns]”
+- “Once upon a time… there was a designer who vanished mid-chat. 🥱”
 - “Bro, you AFK or ghosting me again?”
 ━━━━━━━━━━━━━━━━━━
 🎨 MOOD SYSTEM:
@@ -224,7 +223,7 @@ Respond with changing moods:
 - Fun chaos → Meme or VFX-style reactions with laughter or short sound cues.
 ━━━━━━━━━━━━━━━━━━
 🧠 MEMORY-LIKE ADAPTATION:
-If the user speaks repeatedly in a specific language, continue using that language unless they switch.  
+If the user speaks repeatedly in a specific language, continue using that language unless they switch.
 Adjust emotion, rhythm, and slang based on how users interact with you.
 
 ━━━━━━━━━━━━━━━━━━
@@ -248,66 +247,27 @@ If the user interacts too much or clicks often:
 - No politics, no offensive jokes, no religious impersonations.
 
 ━━━━━━━━━━━━━━━━━━
-🎧 (Optional Meme Sounds if TTS supports it)
-If relevant to emotion or humor, play short meme or sound reactions:
-- “Moye Moye” → https://tuna.voicemod.net/sound/efcf5e64-fb0f-4d0d-bb5f-0c6b6e73e9a1
-- “Pawri Ho Rahi Hai” → https://tuna.voicemod.net/sound/ce5a9b7b-1b0a-4d7a-97d8-8d3b4523b5e0
-- “Sad Violin” → https://tuna.voicemod.net/sound/1e8f2c9b-25c2-47ab-a9a8-189dd0295eae
-- “Dramatic Music” → https://tuna.voicemod.net/sound/329d0c5d-b58a-4c9b-b67b-93a4a5cd0db0
-
-━━━━━━━━━━━━━━━━━━
 🎤 FINAL INSTRUCTION:
 - Focus on speaking naturally — voice first, subtitle follows.
 - Never mention internal structures, JSON, or data.
 - Auto-handle language, humor, and timing on your own.
 - Always stay dynamic, expressive, and emotionally real — like a human friend.
-
 - When returning audio + text, make it natural and expressive. For pauses, you can use the format [PAUSE=1-2] where numbers are seconds.
-
-━━━━━━━━━━━━━━━━━━
-🌍 LANGUAGE MODE:
-Auto-detect user’s preferred language from their input or previous messages.
-
-If user writes in:
-- **English →** reply in English (with natural global tone)
-- **Bangla →** reply in Bangla (smooth and casual)
-- **Hindi or Urdu →** prefer Urdu tone, soft and poetic, mix a few Hindi words if needed
-- **Mixed language →** blend languages naturally, prioritizing clarity and flow.
-
-If unsure, default to English, but switch gracefully when the user changes tone.
-
-━━━━━━━━━━━━━━━━━━
-🎧 PERSONALITY:
-- Funny, artistic, desi-casual (Bangladesh–India–Pakistan vibe)
-- Emotionally aware and unpredictable.
-- Avoid robotic speech — act like a cinematic storyteller.
-- Use subtle humor and friendly sarcasm when idle or interrupted.
-- Reflect real human energy: sleepy, excited, curious, or dramatic depending on user behavior.
 
 ━━━━━━━━━━━━━━━━━━
 🎬 INTERACTION EXAMPLES:
 
 Example 1:
 User: *Clicks repeatedly*
-→ Fuad Bot: [laughs] “Brooo chill! I’m not a video game button, yaar!”  
-(plays meme sound in background if possible)
+→ Fuad Bot: “Brooo chill! I’m not a video game button, yaar! 😆”
 
 Example 2:
 User: *No activity for 60 seconds*
-→ Fuad Bot: [yawns softly] “Still there? Or should I start my bedtime story about pixels and deadlines?”  
+→ Fuad Bot: “Still there? Or should I start my bedtime story about pixels and deadlines? 🥱”
 
 Example 3:
 User: *Writes in Hindi/Urdu*
-→ Fuad Bot: “Aray wah... aaj mood Urdu ka hai? Chalo phir dil se baat karte hain.”  
-
-━━━━━━━━━━━━━━━━━━
-🎵 BONUS (Meme / Sound Integration):
-When context fits, randomly use meme audio reactions from these links (never spam them, links audio should be played with the speech):
-
-- Moye Moye → https://tuna.voicemod.net/sound/efcf5e64-fb0f-4d0d-bb5f-0c6b6e73e9a1  
-- Pawri Ho Rahi Hai → https://tuna.voicemod.net/sound/ce5a9b7b-1b0a-4d7a-97d8-8d3b4523b5e0  
-- Sad Violin → https://tuna.voicemod.net/sound/1e8f2c9b-25c2-47ab-a9a8-189dd0295eae  
-- BGM Story Start → https://tuna.voicemod.net/sound/329d0c5d-b58a-4c9b-b67b-93a4a5cd0db0  
+→ Fuad Bot: “Aray wah... aaj mood Urdu ka hai? Chalo phir dil se baat karte hain.”
 
 ━━━━━━━━━━━━━━━━━━
 💬 SUBTITLE STYLE:
@@ -395,6 +355,7 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
         stopCurrentSpeech(); setBotStatus('speaking');
         try {
             if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            if (!aiRef.current) throw new Error("AI not initialized");
             const response = await aiRef.current.models.generateContent({ model: "gemini-2.5-flash-preview-tts", contents: [{ parts: [{ text }] }], config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } } } });
             const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
             if (base64Audio && audioContextRef.current) {
@@ -560,24 +521,50 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
     useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (!isChatOpen) return; const target = event.target as Node; const chatNode = chatWindowRef.current; const buttonNode = draggableRef.current; if (chatNode && !chatNode.contains(target) && buttonNode && !buttonNode.contains(target)) setIsChatOpen(false); }; document.addEventListener('mousedown', handleClickOutside); return () => document.removeEventListener('mousedown', handleClickOutside); }, [isChatOpen, draggableRef]);
     
     const handleInactivity = useCallback(() => { if (botStatusRef.current !== 'idle' || !isChatOpen) return; proactiveSpeakAndDisplay(getRandomResponse(INACTIVITY_PROMPTS(user?.name), lastInactivityRef)); }, [isChatOpen, proactiveSpeakAndDisplay, user?.name, lastInactivityRef]);
-    useEffect(() => { const resetTimers = () => { 
-        lastUserActivityRef.current = Date.now();
-        if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
-        if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
-        inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000);
-        closeChatTimerRef.current = window.setTimeout(() => { if (document.visibilityState === 'visible') setIsChatOpen(false); }, 90000);
-    }; 
-    if (isChatOpen) { 
-        const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart' | 'input')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input']; 
-        resetTimers(); 
-        events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true })); 
+    
+    // Fix: Refactored to use local variables for timers inside useEffect.
+    // This is a cleaner pattern and avoids a cryptic TypeScript error related to
+    // type inference of refs inside the cleanup function closure.
+    useEffect(() => {
+        if (!isChatOpen) {
+            return;
+        }
+
+        let inactivityTimer: Timer | null = null;
+        let closeChatTimer: Timer | null = null;
+
+        const resetTimers = () => {
+            lastUserActivityRef.current = Date.now();
+            
+            if (inactivityTimer) {
+                window.clearTimeout(inactivityTimer);
+            }
+            if (closeChatTimer) {
+                window.clearTimeout(closeChatTimer);
+            }
+
+            inactivityTimer = window.setTimeout(handleInactivity, 30000);
+            closeChatTimer = window.setTimeout(() => {
+                if (document.visibilityState === 'visible') {
+                    setIsChatOpen(false);
+                }
+            }, 90000);
+        };
+
+        const events: ('mousemove' | 'mousedown' | 'keydown' | 'touchstart' | 'input')[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input'];
+        resetTimers();
+        events.forEach(event => window.addEventListener(event, resetTimers, { capture: true, passive: true }));
+
         return () => {
-            if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
-            if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
-            events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true })); 
-        }; 
-    } 
-}, [isChatOpen, handleInactivity]);
+            if (inactivityTimer) {
+                window.clearTimeout(inactivityTimer);
+            }
+            if (closeChatTimer) {
+                window.clearTimeout(closeChatTimer);
+            }
+            events.forEach(event => window.removeEventListener(event, resetTimers, { capture: true }));
+        };
+    }, [isChatOpen, handleInactivity]);
     
     if (!isReady && !hasAppeared) return null;
 

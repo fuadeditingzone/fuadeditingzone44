@@ -117,34 +117,47 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firebaseUser) { setError('An error occurred. Please try signing in again.'); return; }
-        if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) { setError('Please fill in all required fields.'); return; }
-        
-        const usernameExists = await isUsernameTaken(formData.username);
-        if (usernameExists) {
-            setError('This username is already taken. Please choose another.');
+        if (!firebaseUser) {
+            setError('An error occurred. Please try signing in again.');
             return;
         }
-        
-        setError('');
+        if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) {
+            setError('Please fill in all required fields.');
+            return;
+        }
+
         setIsLoading(true);
-        
-        const newUserPayload: Omit<User, 'uid' | 'email' | 'avatarUrl'> = {
-            ...formData,
-            bio,
-            ...socials,
-        };
+        setError('');
 
-        const newUser = await createUserProfile(newUserPayload, avatarFile || undefined);
-        setIsLoading(false);
+        try {
+            const usernameExists = await isUsernameTaken(formData.username);
+            if (usernameExists) {
+                setError('This username is already taken. Please choose another.');
+                return; // Finally block will handle loading state
+            }
 
-        if (newUser) {
-            onRegisterSuccess(newUser);
-            onClose();
-        } else {
-            setError('Failed to create profile. The email might already be in use.');
+            const newUserPayload: Omit<User, 'uid' | 'email' | 'avatarUrl'> = {
+                ...formData,
+                bio,
+                ...socials,
+            };
+
+            const newUser = await createUserProfile(newUserPayload, avatarFile || undefined);
+
+            if (newUser) {
+                onRegisterSuccess(newUser);
+                onClose();
+            } else {
+                setError('Failed to create profile. The email might already be in use or another error occurred.');
+            }
+        } catch (err) {
+            console.error("Profile creation failed:", err);
+            setError('An unexpected error occurred. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
+
 
     return (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>

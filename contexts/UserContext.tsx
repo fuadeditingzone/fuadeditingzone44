@@ -68,36 +68,40 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const createUserProfile = async (userData: Omit<User, 'uid' | 'email'>, avatarFile?: File): Promise<User | null> => {
         if (!firebaseUser) return null;
-
-        let avatarUrl = undefined;
-        if (avatarFile) {
-            const storageRef = ref(storage, `avatars/${firebaseUser.uid}`);
-            await uploadBytes(storageRef, avatarFile);
-            avatarUrl = await getDownloadURL(storageRef);
+        try {
+            let avatarUrl = undefined;
+            if (avatarFile) {
+                const storageRef = ref(storage, `avatars/${firebaseUser.uid}`);
+                await uploadBytes(storageRef, avatarFile);
+                avatarUrl = await getDownloadURL(storageRef);
+            }
+            
+            const newUser: User = {
+                ...userData,
+                uid: firebaseUser.uid,
+                email: firebaseUser.email!,
+                avatarUrl,
+            };
+            
+            await setDoc(doc(db, "users", firebaseUser.uid), {
+                username: newUser.username,
+                name: newUser.name,
+                email: newUser.email,
+                profession: newUser.profession,
+                role: newUser.role,
+                bio: newUser.bio || '',
+                avatarUrl: newUser.avatarUrl || '',
+                linkedinUrl: newUser.linkedinUrl || '',
+                facebookUrl: newUser.facebookUrl || '',
+                instagramUrl: newUser.instagramUrl || '',
+                behanceUrl: newUser.behanceUrl || '',
+            });
+            setCurrentUser(newUser);
+            return newUser;
+        } catch (error) {
+            console.error("Error creating user profile:", error);
+            return null;
         }
-        
-        const newUser: User = {
-            ...userData,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email!,
-            avatarUrl,
-        };
-        
-        await setDoc(doc(db, "users", firebaseUser.uid), {
-            username: newUser.username,
-            name: newUser.name,
-            email: newUser.email,
-            profession: newUser.profession,
-            role: newUser.role,
-            bio: newUser.bio || '',
-            avatarUrl: newUser.avatarUrl || '',
-            linkedinUrl: newUser.linkedinUrl || '',
-            facebookUrl: newUser.facebookUrl || '',
-            instagramUrl: newUser.instagramUrl || '',
-            behanceUrl: newUser.behanceUrl || '',
-        });
-        setCurrentUser(newUser);
-        return newUser;
     };
     
     const updateUser = async (uid: string, updatedData: Partial<User>, newAvatarFile?: File): Promise<boolean> => {
@@ -166,7 +170,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getUserByUsername,
         updateUser,
         getAllUsers,
-    }), [currentUser, firebaseUser, loading, isLocked]);
+    }), [currentUser, firebaseUser, loading, isLocked, lockSite, unlockSite, isUsernameTaken, findUsers, getUserByUsername, updateUser, getAllUsers, handleGoogleSignIn, createUserProfile, logout]);
 
     return (
         <UserContext.Provider value={value}>
