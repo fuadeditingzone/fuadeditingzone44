@@ -68,7 +68,6 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({ job, onClose, 
     const [showHireWarning, setShowHireWarning] = useState<string | null>(null);
 
     const isOwner = currentUser?.username === job.clientUsername;
-    // FIX: Add optional chaining to prevent crash when currentUser is null.
     const isDesigner = currentUser?.role === 'designer';
     const hasAlreadySubmitted = currentUser ? hasSubmitted(job.id, currentUser.username) : false;
 

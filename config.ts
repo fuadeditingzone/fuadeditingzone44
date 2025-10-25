@@ -110,7 +110,7 @@ export const siteConfig = {
     // Feature Flags
     features: {
         marketplace: {
-            enabled: false,
+            enabled: true,
         },
     },
     // Audio Configuration
@@ -128,5 +128,15 @@ export const siteConfig = {
             welcomeExit: { src: 'https://www.dropbox.com/scl/fi/cosps94ob7q539morzdo9/ui-sounds-pack-2-sound-5-358890.mp3?rlkey=co0gvw2403tc2ws0dhg9eavbr&st=y564seth&dl=1', volume: 0.5, loop: false },
         },
         profileCreationSound: 'https://www.dropbox.com/scl/fi/78emjppfcksgj0yhok7q9/sfx-hi-tech-user-interface-sound-effects-335625.mp3?rlkey=gzzcnclho2bjj309egfgwhmr0&st=pp7s7qe0&dl=1',
+    },
+    // Firebase Configuration
+    firebase: {
+        apiKey: "AIzaSyCA_nAtmaN9Bs7a5q-c9za5eSMnk0Ys5Xs",
+        authDomain: "fuad-editing-zone.firebaseapp.com",
+        projectId: "fuad-editing-zone",
+        storageBucket: "fuad-editing-zone.firebasestorage.app",
+        messagingSenderId: "832389657221",
+        appId: "1:832389657221:web:8a85d5dda0803770376fec",
+        measurementId: "G-ZCKW4GPDLT"
     },
 };

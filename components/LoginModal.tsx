@@ -72,6 +72,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
     useEffect(() => {
         if (firebaseUser && !currentUser) {
             setFormData(prev => ({ ...prev, name: firebaseUser.displayName || '' }));
+            if (firebaseUser.photoURL) {
+                fetch(firebaseUser.photoURL)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], "profile.jpg", { type: blob.type });
+                        setAvatarFile(file);
+                        setAvatarPreview(URL.createObjectURL(blob));
+                    })
+                    .catch(console.error);
+            }
             setStep('creating_profile');
         } else if (currentUser) {
             onClose();
@@ -217,7 +227,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                                     ) : (
                                         <>
                                             <GoogleIcon className="w-6 h-6" />
-                                            <span>Continue with Google</span>
+                                            <span>Sign in with Google</span>
                                         </>
                                     )}
                                 </button>

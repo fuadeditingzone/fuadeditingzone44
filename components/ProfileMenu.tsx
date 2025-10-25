@@ -43,7 +43,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onClose, onLogout, onV
                     onClick={() => { onLogout(); onClose(); }}
                     className="group w-full flex items-center text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-red-500/20 hover:text-white transition-all duration-200"
                 >
-                    Logout
+                    Sign out
                 </button>
             </div>
         </div>
