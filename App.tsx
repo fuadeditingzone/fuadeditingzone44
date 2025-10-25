@@ -45,7 +45,7 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
 type AppState = 'welcome' | 'entered';
 
 const AppContent = () => {
-  const { currentUser, isLocked, lockSite, unlockSite, findUsers } = useUser();
+  const { currentUser, isLocked, lockSite, unlockSite, findUsers, getUserByUsername } = useUser();
   const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -107,17 +107,36 @@ const AppContent = () => {
     }, 10 * 60 * 1000);
     return () => clearTimeout(timer);
   }, [currentUser, isLocked, lockSite, appState]);
+  
+  const handleProfileModalClose = useCallback(() => {
+    setIsProfileModalOpen(false);
+    setViewingUser(null);
+    window.history.pushState({}, '', '/');
+  }, []);
+
+  const viewProfile = useCallback((user: User) => {
+      setViewingUser(user);
+      setIsSearchResultsModalOpen(false); // if it was opened from search
+      setIsProfileModalOpen(true);
+      window.history.pushState({}, '', `/${user.username}`);
+  }, []);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.length > 1 && appState === 'entered') {
+        const username = path.substring(1).toLowerCase();
+        const userToShow = getUserByUsername(username);
+        if (userToShow) {
+            setViewingUser(userToShow);
+            setIsProfileModalOpen(true);
+        }
+    }
+  }, [getUserByUsername, appState]);
 
   const handleSearch = (query: string) => {
       const results = findUsers(query);
       setSearchResults(results);
       setIsSearchResultsModalOpen(true);
-  };
-
-  const viewProfile = (user: User) => {
-      setViewingUser(user);
-      setIsSearchResultsModalOpen(false);
-      setIsProfileModalOpen(true);
   };
   
   const handleLoginModalClose = useCallback(() => {
@@ -403,9 +422,10 @@ const AppContent = () => {
           <WelcomeScreen onEnter={handleEnter} onInteraction={unlockAudio} />
       </div>
       
+      <CustomCursor isVisible={!isLocked && appState === 'entered'} />
+
       <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
-        <CustomCursor isVisible={!isLocked} />
         
         <Header 
             onScrollTo={scrollToSection} 
@@ -446,7 +466,7 @@ const AppContent = () => {
         )}
       </div>
 
-      {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={() => { setIsProfileModalOpen(false); setViewingUser(null); }} />}
+      {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={handleProfileModalClose} />}
       {isLoginModalOpen && <LoginModal onClose={handleLoginModalClose} onRegisterSuccess={handleRegisterSuccess} />}
       {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
 

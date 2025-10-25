@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { LOGO_URL } from '../constants';
@@ -24,6 +24,14 @@ const SpinnerIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+const CameraIcon = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+    </svg>
+);
+
+
 const benefits = [
     { icon: StreamPackageIcon, text: "Play background music by command." },
     { icon: UsersIcon, text: "Become visible with a public profile." },
@@ -39,6 +47,8 @@ interface LoginModalProps {
     onRegisterSuccess: (user: User) => void;
 }
 
+type Socials = Pick<User, 'linkedinUrl' | 'facebookUrl' | 'instagramUrl' | 'behanceUrl'>;
+
 export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSuccess }) => {
     const { register, login, isUsernameTaken } = useUser();
     
@@ -46,11 +56,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
     const [isLoading, setIsLoading] = useState(false);
     const [googleUser, setGoogleUser] = useState<{ email: string; name: string } | null>(null);
 
-    const [formData, setFormData] = useState<Omit<User, 'bio' | 'email'>>({
+    const [formData, setFormData] = useState<Omit<User, 'bio' | 'email' | 'avatarUrl' | keyof Socials>>({
         username: '', name: '', profession: '', role: 'client',
     });
+    const [socials, setSocials] = useState<Socials>({
+        linkedinUrl: '', facebookUrl: '', instagramUrl: '', behanceUrl: ''
+    });
+
     const [bio, setBio] = useState('');
     const [error, setError] = useState('');
+    
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -59,9 +77,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
         else if (name === 'bio') { setBio(value); } 
         else { setFormData({ ...formData, [name]: value }); }
     };
+    
+    const handleSocialsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setSocials(prev => ({ ...prev, [name]: value }));
+    };
 
     const handleProfessionTagClick = (profession: string) => {
         setFormData({ ...formData, profession });
+    };
+    
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                setAvatarPreview(result);
+                setAvatarDataUrl(result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click();
     };
 
     const handleGoogleSignIn = async () => {
@@ -96,7 +136,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
         const newUserPayload: User = {
             ...formData,
             email: googleUser.email,
-            bio
+            bio,
+            avatarUrl: avatarDataUrl,
+            ...socials,
         };
 
         const newUser = register(newUserPayload);
@@ -137,7 +179,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                         </ul>
                     </div>
                     {/* Form Panel */}
-                    <div className="w-full md:w-3/5 p-8 flex flex-col justify-center">
+                    <div className="w-full md:w-3/5 p-8 flex flex-col justify-center max-h-[90vh] overflow-y-auto">
                         {step === 'initial' && (
                             <div className="text-center">
                                 <h2 className="text-3xl font-bold text-white mb-2">Join the Zone</h2>
@@ -165,6 +207,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                                 <p className="text-gray-400 mb-4 text-center md:text-left">Signed in as <span className="font-semibold text-gray-300">{googleUser.email}</span></p>
                                 
                                 <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                                    <div className="flex justify-center mb-4">
+                                        <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
+                                        <button type="button" onClick={handleAvatarClick} className="relative w-24 h-24 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 hover:border-red-500 hover:text-red-500 transition-all group overflow-hidden">
+                                            {avatarPreview ? (
+                                                <img src={avatarPreview} alt="Avatar Preview" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <CameraIcon className="w-10 h-10" />
+                                            )}
+                                            <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="text-white text-xs font-bold">Upload</span>
+                                            </div>
+                                        </button>
+                                    </div>
+
                                     <div>
                                         <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">Username</label>
                                         <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-red-500 transition-all">
@@ -192,6 +248,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                                             <label className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all"><input type="radio" name="role" value="designer" checked={formData.role === 'designer'} onChange={(e) => setFormData(p => ({...p, role: 'designer'}))} className="accent-red-500" /><span className="text-gray-200">Designer</span></label>
                                         </div>
                                     </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">Social Links (Optional)</label>
+                                        <div className="space-y-3">
+                                            <input name="linkedinUrl" type="url" value={socials.linkedinUrl} onChange={handleSocialsChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="LinkedIn Profile URL"/>
+                                            <input name="facebookUrl" type="url" value={socials.facebookUrl} onChange={handleSocialsChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="Facebook Profile URL"/>
+                                            <input name="instagramUrl" type="url" value={socials.instagramUrl} onChange={handleSocialsChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="Instagram Profile URL"/>
+                                            <input name="behanceUrl" type="url" value={socials.behanceUrl} onChange={handleSocialsChange} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="Behance Profile URL"/>
+                                        </div>
+                                    </div>
+
                                     {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                                     <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2">Create Profile</button>
                                 </form>

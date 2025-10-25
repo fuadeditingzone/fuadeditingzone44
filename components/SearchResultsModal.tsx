@@ -43,8 +43,12 @@ export const SearchResultsModal: React.FC<SearchResultsModalProps> = ({ users, o
                                 onClick={() => onViewProfile(user)}
                                 className="w-full flex items-center gap-4 p-3 rounded-lg bg-gray-800/50 hover:bg-red-500/20 border border-gray-700 hover:border-red-500/50 transition-all text-left"
                             >
-                                <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0">
-                                    <span className="text-xl font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+                                <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                    {user.avatarUrl ? (
+                                        <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-xl font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+                                    )}
                                 </div>
                                 <div>
                                     <p className="font-bold text-white">{user.name}</p>

@@ -50,4 +50,9 @@ export interface User {
   profession: string;
   role: 'client' | 'designer';
   bio: string;
+  avatarUrl?: string;
+  linkedinUrl?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  behanceUrl?: string;
 }

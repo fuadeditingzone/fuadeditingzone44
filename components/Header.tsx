@@ -114,8 +114,14 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
               <div className="relative">
                 {currentUser ? (
                   <button onClick={() => setIsProfileMenuOpen(p => !p)} className="flex-shrink-0" aria-label="Open profile menu">
-                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center border-2 border-gray-600 hover:border-red-500 transition-all duration-300 glow-shadow-sm transform hover:scale-110">
-                      <span className="text-xl font-bold text-white">{currentUser.name.charAt(0).toUpperCase()}</span>
+                    <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center border-2 border-gray-600 hover:border-red-500 transition-all duration-300 glow-shadow-sm transform hover:scale-110 overflow-hidden">
+                      {currentUser.avatarUrl ? (
+                        <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-red-600 flex items-center justify-center">
+                          <span className="text-xl font-bold text-white">{currentUser.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
                     </div>
                   </button>
                 ) : (

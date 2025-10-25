@@ -54,8 +54,12 @@ const getRandomResponse = (responses: string[], lastResponseRef?: React.MutableR
 const ProfileCardInChat = React.memo(({ user }: { user: User }) => (
     <div className="bg-gray-800 border border-red-500/30 rounded-xl p-4 w-full max-w-xs animate-flip-in-3d">
         <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center border-2 border-gray-700 flex-shrink-0">
-                <span className="text-3xl font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+            <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center border-2 border-gray-700 flex-shrink-0 overflow-hidden">
+                {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                    <span className="text-3xl font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+                )}
             </div>
             <div>
                 <h4 className="font-bold text-white text-lg">{user.name}</h4>
@@ -281,7 +285,7 @@ If user writes in:
 - **Hindi or Urdu →** prefer Urdu tone, soft and poetic, mix a few Hindi words if needed
 - **Mixed language →** blend languages naturally, prioritizing clarity and flow.
 
-If unsure → default to English, but switch gracefully when the user changes tone.
+If unsure, default to English, but switch gracefully when the user changes tone.
 
 ━━━━━━━━━━━━━━━━━━
 🎧 PERSONALITY:

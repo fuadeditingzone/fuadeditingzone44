@@ -58,6 +58,10 @@ export const GoogleIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const LinkedInIcon = ({ className }: { className?: string }) => (
+  <i className={`fa-brands fa-linkedin-in ${className || ''}`} />
+);
+
 
 // --- Service Icons ---
 export const PhotoManipulationIcon = ({ className }: { className?: string }) => (
