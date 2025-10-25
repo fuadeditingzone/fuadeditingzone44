@@ -70,6 +70,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     };
                     setCurrentUser(appUser);
                 } else {
+                    // New user, profile needs to be created
                     setCurrentUser(null);
                 }
             } else {
@@ -96,6 +97,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
         const querySnapshot = await getDocs(q);
         if (querySnapshot.empty) return false;
+        // If we are checking for the current user's own username during an update, it's not "taken" by someone else.
         if (currentUid && querySnapshot.docs[0].id === currentUid) return false;
         return true;
     };

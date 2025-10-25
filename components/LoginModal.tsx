@@ -73,6 +73,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
         if (firebaseUser && !currentUser) {
             setFormData(prev => ({ ...prev, name: firebaseUser.displayName || '' }));
             if (firebaseUser.photoURL) {
+                // Fetch the image and create a File object to be uploaded to our own storage
                 fetch(firebaseUser.photoURL)
                     .then(res => res.blob())
                     .then(blob => {
@@ -156,7 +157,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
             const usernameExists = await isUsernameTaken(formData.username);
             if (usernameExists) {
                 setError('This username is already taken. Please choose another.');
-                return; // Finally block will handle loading state
+                setIsLoading(false); // Stop loading on validation error
+                return;
             }
 
             const newUserPayload: Omit<User, 'uid' | 'email' | 'avatarUrl'> = {
@@ -281,7 +283,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                                             <label className="flex-1 flex items-center gap-2 p-3 bg-gray-800 border border-gray-600 rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all"><input type="radio" name="role" value="designer" checked={formData.role === 'designer'} onChange={(e) => setFormData(p => ({...p, role: 'designer'}))} className="accent-red-500" /><span className="text-gray-200">Designer</span></label>
                                         </div>
                                     </div>
-
+                                    <div>
+                                        <label htmlFor="bio" className="block text-sm font-medium text-gray-300 mb-1">Bio (Optional)</label>
+                                        <textarea id="bio" name="bio" value={bio} onChange={handleChange} rows={3} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" placeholder="Tell us a little about yourself..."/>
+                                    </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-300 mb-2">Social Links (Optional)</label>
                                         <div className="space-y-3">

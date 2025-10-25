@@ -61,12 +61,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClos
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        setError('');
 
-        const usernameExists = await isUsernameTaken(formData.username, user.uid);
-        if (usernameExists) {
-            setError('This username is already taken.');
-            setIsLoading(false);
-            return;
+        if (formData.username !== user.username) {
+            const usernameExists = await isUsernameTaken(formData.username, user.uid);
+            if (usernameExists) {
+                setError('This username is already taken.');
+                setIsLoading(false);
+                return;
+            }
         }
         
         const updatedPayload: Partial<User> = { ...formData };

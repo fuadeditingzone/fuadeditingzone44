@@ -152,14 +152,12 @@ const AppContent = () => {
   const handleProfileModalClose = useCallback(() => {
     setIsProfileModalOpen(false);
     setViewingUser(null);
-    window.history.pushState({}, '', '/');
   }, []);
 
   const viewProfile = useCallback((user: User) => {
       setViewingUser(user);
       setIsSearchResultsModalOpen(false);
       setIsProfileModalOpen(true);
-      window.history.pushState({}, '', `/${user.username}`);
   }, []);
   
   const viewProfileByUsername = useCallback(async (username: string) => {
@@ -172,32 +170,6 @@ const AppContent = () => {
         viewProfile(user);
     }
   }, [getUserByUsername, viewProfile, viewingJob]);
-
-  useEffect(() => {
-    const handlePopState = async () => {
-        const path = window.location.pathname;
-        if (path.length > 1) {
-            const username = path.substring(1).toLowerCase();
-            const userToShow = await getUserByUsername(username);
-            if (userToShow) {
-                setViewingUser(userToShow);
-                setIsProfileModalOpen(true);
-            }
-        } else {
-            setIsProfileModalOpen(false);
-            setViewingUser(null);
-        }
-    };
-    
-    // Initial check on load
-    if (appState === 'entered') {
-        handlePopState();
-    }
-    
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [getUserByUsername, appState]);
-
 
   const handleSearch = async (query: string) => {
       const results = await findUsers(query);

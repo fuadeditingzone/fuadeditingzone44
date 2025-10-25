@@ -39,7 +39,7 @@ export interface User {
   uid: string;
   username: string;
   name: string;
-  email?: string;
+  email: string;
   profession: string;
   role: 'client' | 'designer';
   bio?: string;

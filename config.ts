@@ -110,7 +110,7 @@ export const siteConfig = {
     // Feature Flags
     features: {
         marketplace: {
-            enabled: true,
+            enabled: false,
         },
     },
     // Audio Configuration
