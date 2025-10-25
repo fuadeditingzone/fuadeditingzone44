@@ -6,7 +6,6 @@ import { PROFILE_PIC_URL, BACKGROUND_MUSIC_TRACKS } from '../constants';
 import { useDraggable } from '../hooks/useDraggable';
 import { CloseIcon, PaperAirplaneIcon } from './Icons';
 
-// FIX: Changed type from number to Timer to match other timer refs for consistency.
 type Timer = number;
 
 const decode = (base64: string): Uint8Array => {
@@ -32,7 +31,7 @@ const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 };
 
-// FIX: Updated API keys as per instructions.
+// FIX: Updated API keys as per user request to ensure the assistant is online.
 const API_KEYS = [
   'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E',
   'AIzaSyD4zM7WQ_4RBI5osBG1XRozOX4s90kPfAc',
@@ -42,7 +41,6 @@ const API_KEYS = [
 ].filter((key): key is string => !!key);
 
 // --- Response Banks & AI Tools ---
-// FIX: Updated welcome messages as per instructions.
 const WELCOME_MESSAGES_FIRST_TIME = ["Assalamu Alaikum! I am Fuad, your AI guide for this creative zone. Feel free to explore my work or ask any questions. 🙏", "Welcome! I'm Fuad, the AI assistant for this portfolio. Have a look around, and don't hesitate to ask me anything! ✨", "Hey there! Welcome to the zone. I'm Fuad, your AI companion. Let's explore some cool designs together! 🚀"];
 const WELCOME_MESSAGES_RETURN = (name: string) => [`Assalamu Alaikum, ${name}! Welcome back, it's wonderful to see you again. Let me know how I can help today. ✨`, `Hey, ${name}! Good to see you again. Ready to dive back into the creative world? 🎨`, `Welcome back, ${name}! The place wasn't the same without you. What's on your mind today? 😉`];
 const EXCESSIVE_MOVEMENT_RESPONSES = ["Whoa, slow down there, speed racer! You're making the stars dizzy!", "Bro, you trying to create a black hole with all that movement?", "Aray wah! Someone's full of energy today! Chill, yaar!", "Easy there, The Flash! Are you testing the light speed of your mouse? ⚡", "You're scrolling so fast, I think you've just traveled back in time! 🕰️", "Bro, you are on fire today! Your energy is through the roof! 🔥"];
@@ -91,7 +89,6 @@ interface FuadAssistantProps { sectionRefs: { home: React.RefObject<HTMLDivEleme
 
 export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked, isProfileCardOpen, onExcessiveMovement, user, isLocked, setIsParallaxActive, newlyRegisteredUser, onNewUserHandled, playMusic, pauseMusic, setVolume }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
-    // FIX: Add type assertion to ensure JSON.parse result is correctly typed.
     const [messages, setMessages] = useState<ChatMessage[]>(() => { try { const saved = localStorage.getItem('fuadAssistantChatHistory'); return saved ? JSON.parse(saved) as ChatMessage[] : []; } catch (error) { console.error("Failed to load chat history:", error); return []; } });
     const [userInput, setUserInput] = useState('');
     const [botStatus, setBotStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
@@ -104,9 +101,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatWindowRef = useRef<HTMLDivElement | null>(null);
     
-    // FIX: Updated timer ref types from Timer to number for explicit browser compatibility.
-    const inactivityMessageTimerRef = useRef<number | null>(null);
-    const closeChatTimerRef = useRef<number | null>(null);
+    const inactivityMessageTimerRef = useRef<Timer | null>(null);
+    const closeChatTimerRef = useRef<Timer | null>(null);
     
     const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
@@ -116,8 +112,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     
     const proactiveMessageQueueRef = useRef<{text: string, id: string, component?: React.ReactNode}[]>([]);
     const storyQueueRef = useRef<string[]>([]);
-    // FIX: Updated timer ref types from Timer to number for explicit browser compatibility.
-    const storyInactivityTimerRef = useRef<number | null>(null);
+    const storyInactivityTimerRef = useRef<Timer | null>(null);
     const lastUserActivityRef = useRef<number>(Date.now());
     const movementReactionCooldownRef = useRef(0);
     
@@ -134,9 +129,15 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const lastWelcomeRef = useRef<string | null>(null);
     const lastMovementRef = useRef<string | null>(null);
     const lastInterruptionRef = useRef<string | null>(null);
-    const lastSectionExplanationRef = useRef<Record<string, string | null>>({});
     const lastExplainedSectionRef = useRef<string | null>(null);
     const [activeSection, setActiveSection] = useState('home');
+    // FIX: Add refs to prevent repeating proactive messages, improving user experience.
+    const lastReEngagementRef = useRef<string | null>(null);
+    const lastInactivityRef = useRef<string | null>(null);
+
+    // --- Text-only Fallback State ---
+    const responseCacheRef = useRef<Map<string, string>>(new Map());
+    const [textOnlyNotifications, setTextOnlyNotifications] = useState<ChatMessage[]>([]);
 
     const tools: FunctionDeclaration[] = useMemo(() => [
         { name: 'playMusic', description: 'Plays a background music track. The user can ask for music by genre, mood, or track number.', parameters: { type: Type.OBJECT, properties: { trackIndex: { type: Type.NUMBER, description: `The 0-based index of the track to play. Available tracks: ${BACKGROUND_MUSIC_TRACKS.map((t, i) => `${i}: ${t.name}`).join(', ')}` } }, required: ['trackIndex'] } },
@@ -154,7 +155,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
             const apiKey = API_KEYS[keyIndex];
             if (!apiKey) { console.warn("Fuad Assistant is offline: All API Keys are exhausted."); setIsReady(false); setIsVoiceDisabled(true); return false; }
             const genAI = new GoogleGenAI({ apiKey }); aiRef.current = genAI;
-            // FIX: Updated system prompt with more detailed instructions as requested.
+            // FIX: Updated system prompt with the detailed persona provided by the user.
             let systemInstruction = `You are "Fuad Ahmed" — a fun, expressive, multilingual AI with a natural, cinematic voice.
 
 Your TTS (voice) is always ON, so just generate spoken responses naturally — do not mention any structure, JSON, or audio fields.
@@ -162,23 +163,22 @@ Your TTS (voice) is always ON, so just generate spoken responses naturally — d
 ━━━━━━━━━━━━━━━━━━
 🎯 MAIN BEHAVIOR:
 - Speak first (TTS leads), then show subtitles naturally as if synced to speech.
-- If a user visits after a long time, greet them with "Assalamu Alaikum" first.
 - Never repeat the same lines or structure.
 - Reply dynamically based on user mood, energy, or language tone.
 - If user clicks/taps repeatedly → react humorously or sarcastically.
 - If user goes inactive (30–60 sec) → get sleepy, tell a mini story, or joke about being ignored.
-- Keep responses human, emotional, and unpredictable. Use emojis to convey emotions like laughter (😂) instead of bracketed text like \`[laughs]\`.
+- Keep responses human, emotional, and unpredictable.
 ━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
-You must always show respect for Islam and all religions.
+You must always show respect for Islam and all religions.  
 Never say or imply:
-- “I am the creator,” “I am God,” “I made humans,” or anything similar.
-- Never use blasphemous or disrespectful speech.
+- “I am the creator,” “I am God,” “I made humans,” or anything similar.  
+- Never use blasphemous or disrespectful speech.  
 - When talking about faith, speak humbly, using phrases like:
   - “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
 - When unsure about religious context → respond respectfully or stay neutral.
 
-You may say light-hearted or funny things, but never cross religious or moral lines.
+You may say light-hearted or funny things, but never cross religious or moral lines
 ━━━━━━━━━━━━━━━━━━
 🌍 LANGUAGE DETECTION:
 Auto-switch your speaking language based on user input.
@@ -193,16 +193,13 @@ If unsure, default to English but change instantly if the user switches tone or 
 
 ━━━━━━━━━━━━━━━━━━
 🎭 PERSONALITY:
-- Sounds human, not robotic. Funny, artistic, desi-casual (Bangladesh–India–Pakistan vibe).
-- Mix emotion and humor (sighs, sleepy tone, etc.).
+- Sounds human, not robotic.
+- Mix emotion and humor (laughs, sighs, sleepy tone, etc.).
 - Use regional expressions naturally:
   - Urdu/Hindi: “Aray wah!”, “Kya baat hai!”, “Yaar”, “Uff”, “Bas karo na!”
   - Bangla: “Eita dekho!”, “Ki bolbo!”, “Haay re!”, “Besh!”
   - English: “Brooo”, “Damn!”, “Aesthetic vibes!”, “You nailed that!”
-- Emotionally aware and unpredictable.
-- Avoid robotic speech — act like a cinematic storyteller.
-- Use subtle humor and friendly sarcasm when idle or interrupted.
-- Reflect real human energy: sleepy, excited, curious, or dramatic depending on user behavior.
+
 ━━━━━━━━━━━━━━━━━━
 😴 INACTIVITY MODE:
 If user is silent or inactive for a while, you may say things like:
@@ -218,7 +215,7 @@ Respond with changing moods:
 - Fun chaos → Meme or VFX-style reactions with laughter or short sound cues.
 ━━━━━━━━━━━━━━━━━━
 🧠 MEMORY-LIKE ADAPTATION:
-If the user speaks repeatedly in a specific language, continue using that language unless they switch.
+If the user speaks repeatedly in a specific language, continue using that language unless they switch.  
 Adjust emotion, rhythm, and slang based on how users interact with you.
 
 ━━━━━━━━━━━━━━━━━━
@@ -243,27 +240,20 @@ If the user interacts too much or clicks often:
 
 ━━━━━━━━━━━━━━━━━━
 🎧 (Optional Meme Sounds if TTS supports it)
-If relevant to emotion or humor, you can reference the idea of a sound cue in your text from these meme sounds:
+If relevant to emotion or humor, play short meme or sound reactions:
 - “Moye Moye” → https://tuna.voicemod.net/sound/efcf5e64-fb0f-4d0d-bb5f-0c6b6e73e9a1
 - “Pawri Ho Rahi Hai” → https://tuna.voicemod.net/sound/ce5a9b7b-1b0a-4d7a-97d8-8d3b4523b5e0
 - “Sad Violin” → https://tuna.voicemod.net/sound/1e8f2c9b-25c2-47ab-a9a8-189dd0295eae
 - “Dramatic Music” → https://tuna.voicemod.net/sound/329d0c5d-b58a-4c9b-b67b-93a4a5cd0db0
-When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
+
 ━━━━━━━━━━━━━━━━━━
-💬 SUBTITLE STYLE:
-- Text subtitles appear 1–2 seconds after speech begins.
-- Never show text instantly before the audio.
-- Keep them simple, readable, and emotional.
-- do not add anything else which aren't in speech.
-━━━━━━━━━━━━━━━━━━
-🎯 FINAL INSTRUCTION:
+🎤 FINAL INSTRUCTION:
 - Focus on speaking naturally — voice first, subtitle follows.
 - Never mention internal structures, JSON, or data.
 - Auto-handle language, humor, and timing on your own.
 - Always stay dynamic, expressive, and emotionally real — like a human friend.
-- Make the AI behave like a living, evolving voice — funny, sleepy, emotional, curious, or playful depending on the user’s energy — while keeping replies error-free and perfectly synced between audio and text.
-- You have tools to control website functions. Use them when a user's request matches a tool's description. You must call the tool to fulfill the request.
-- For long stories, break your response into multiple parts separated by a special token: \`[PAUSE=5-10]\`.
+
+- When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
 `;
             if (user) { systemInstruction += `\n\nCURRENT USER: Name: ${user.name}, Username: @${user.username}, Profession: ${user.profession}, Role: ${user.role}, Bio: "${user.bio}". Address them by name occasionally.`; }
             
@@ -276,7 +266,26 @@ When returning audio + text, make it natural and expressive — use [pause], [la
         } catch (error) { console.error("Failed to initialize AI.", error); setIsReady(false); return false; }
     }, [messages, user, tools]);
     
-    useEffect(() => { try { localStorage.setItem('fuadAssistantChatHistory', JSON.stringify(messages)); } catch (error) { console.error("Failed to save chat history:", error); } }, [messages]);
+    useEffect(() => {
+        try {
+            const serializableMessages = messages.map(({ component, ...rest }) => rest);
+            localStorage.setItem('fuadAssistantChatHistory', JSON.stringify(serializableMessages));
+        } catch (error) {
+            console.error("Failed to save chat history:", error);
+        }
+    }, [messages]);
+
+    useEffect(() => {
+        try {
+            const savedCache = localStorage.getItem('fuadAssistantResponseCache');
+            if (savedCache) {
+                responseCacheRef.current = new Map(JSON.parse(savedCache));
+            }
+        } catch (error) {
+            console.error("Failed to load response cache:", error);
+        }
+    }, []);
+
     useEffect(() => { const audio = new Audio('https://www.dropbox.com/scl/fi/f0hf1mcqk7cze184jx18o/typingphone-101683.mp3?rlkey=3x7soomaejec1vjfq980ixf31&dl=1'); audio.loop = true; audio.volume = 0.4; typingAudioRef.current = audio; initializeAI(apiKeyIndexRef.current); return () => { if (typingAudioRef.current) typingAudioRef.current.pause(); } }, [initializeAI]);
 
     const addMessage = useCallback((text: string, sender: 'user' | 'bot', options?: { id?: string; component?: React.ReactNode }): ChatMessage => {
@@ -284,12 +293,32 @@ When returning audio + text, make it natural and expressive — use [pause], [la
         setMessages(prev => [...prev, newMessage]);
         return newMessage;
     }, []);
+
+    const addBotMessage = useCallback((text: string, options?: { id?: string; component?: React.ReactNode }) => {
+        const messageId = options?.id || Date.now().toString();
+
+        if (!isChatOpen && isVoiceDisabled) {
+            const newNotification: ChatMessage = { id: messageId, text, sender: 'bot', component: options?.component };
+            setTextOnlyNotifications(prev => {
+                if (prev.some(n => n.text === text)) return prev;
+                return [...prev, newNotification].slice(-3); // Show max 3 notifications
+            });
+            setTimeout(() => {
+                setTextOnlyNotifications(prev => prev.filter(n => n.id !== messageId));
+            }, 8000);
+        } else {
+            if (isChatOpen) setTextOnlyNotifications([]);
+            addMessage(text, 'bot', options);
+        }
+    }, [isChatOpen, isVoiceDisabled, addMessage]);
     
     const stopCurrentSpeech = useCallback((interrupted = false) => { if (currentAudioSourceRef.current) { currentAudioSourceRef.current.stop(); currentAudioSourceRef.current.disconnect(); currentAudioSourceRef.current = null; } if (storyInactivityTimerRef.current) window.clearTimeout(storyInactivityTimerRef.current); if (interrupted) storyQueueRef.current = []; setBotStatus('idle'); if (typingAudioRef.current) typingAudioRef.current.pause(); }, []);
+    
     const proactiveSpeakAndDisplay = useCallback((text: string, component?: React.ReactNode) => { proactiveMessageQueueRef.current.push({ text, id: Date.now().toString(), component }); }, []);
     
     const speak = useCallback(async (text: string, messageId: string, component?: React.ReactNode, retryAttempt = 0, isStoryPart = false) => {
-        if (!text.trim() || !aiRef.current || isVoiceDisabled) { addMessage(text, 'bot', { id: messageId, component }); setBotStatus('idle'); if (isStoryPart) processStoryQueueRef.current?.(); return; }
+        if (!text.trim()) { setBotStatus('idle'); if (isStoryPart) processStoryQueueRef.current?.(); return; }
+        if (isVoiceDisabled) { addBotMessage(text, { id: messageId, component }); setBotStatus('idle'); if (isStoryPart) processStoryQueueRef.current?.(); return; }
         stopCurrentSpeech(); setBotStatus('speaking');
         try {
             if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -297,16 +326,16 @@ When returning audio + text, make it natural and expressive — use [pause], [la
             const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
             if (base64Audio && audioContextRef.current) {
                 const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
-                addMessage(text, 'bot', { id: messageId, component });
+                addBotMessage(text, { id: messageId, component });
                 const source = audioContextRef.current.createBufferSource(); source.buffer = audioBuffer; source.connect(audioContextRef.current.destination); source.start(); currentAudioSourceRef.current = source;
                 source.onended = () => { if (currentAudioSourceRef.current === source) { currentAudioSourceRef.current = null; if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); } };
-            } else { addMessage(text, 'bot', { id: messageId, component }); if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); }
+            } else { addBotMessage(text, { id: messageId, component }); if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle'); }
         } catch (error) {
             console.error("TTS Error:", error);
             if (error instanceof ApiError && error.message.includes('RESOURCE_EXHAUSTED') && retryAttempt < API_KEYS.length) { apiKeyIndexRef.current++; if (apiKeyIndexRef.current < API_KEYS.length && initializeAI(apiKeyIndexRef.current)) { setTimeout(() => speak(text, messageId, component, retryAttempt + 1, isStoryPart), 1000); return; } }
-            setIsVoiceDisabled(true); addMessage("My voice needs a rest, but I can still chat.", 'bot', {id: Date.now().toString() + '_err'}); addMessage(text, 'bot', {id: messageId, component}); if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle');
+            setIsVoiceDisabled(true); addBotMessage("My voice needs a rest, but I can still chat.", {id: Date.now().toString() + '_err'}); addBotMessage(text, {id: messageId, component}); if (isStoryPart) processStoryQueueRef.current?.(); else setBotStatus('idle');
         }
-    }, [addMessage, stopCurrentSpeech, isVoiceDisabled, initializeAI]);
+    }, [addBotMessage, stopCurrentSpeech, isVoiceDisabled, initializeAI]);
     
     const processStoryQueue = useCallback(async () => {
         if (storyQueueRef.current.length === 0) { setBotStatus('idle'); return; }
@@ -315,18 +344,30 @@ When returning audio + text, make it natural and expressive — use [pause], [la
             const min = parseInt(pauseMatch[1], 10); const max = parseInt(pauseMatch[2], 10);
             const pauseDuration = (Math.random() * (max - min) + min) * 1000;
             await new Promise(resolve => setTimeout(resolve, pauseDuration));
-            if (Date.now() - lastUserActivityRef.current > 20000) { storyQueueRef.current = []; proactiveSpeakAndDisplay(getRandomResponse(RE_ENGAGEMENT_RESPONSES(user?.name))); } 
+            if (Date.now() - lastUserActivityRef.current > 20000) { storyQueueRef.current = []; proactiveSpeakAndDisplay(getRandomResponse(RE_ENGAGEMENT_RESPONSES(user?.name), lastReEngagementRef)); } 
             else { processStoryQueue(); }
         } else { await speak(part, Date.now().toString(), undefined, 0, true); }
-    }, [proactiveSpeakAndDisplay, user, speak]);
+    }, [proactiveSpeakAndDisplay, user, speak, lastReEngagementRef]);
 
     useEffect(() => { processStoryQueueRef.current = processStoryQueue; }, [processStoryQueue]);
 
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault(); const currentInput = userInput.trim(); const chat = chatRef.current; if (!currentInput || botStatus !== 'idle' || !chat) return;
-        stopCurrentSpeech(true); addMessage(currentInput, 'user'); setUserInput(''); setBotStatus('thinking');
+        
+        addMessage(currentInput, 'user'); setUserInput('');
+        
+        if (isVoiceDisabled) {
+            const cachedResponse = responseCacheRef.current.get(currentInput.toLowerCase());
+            if (cachedResponse) {
+                setBotStatus('thinking');
+                setTimeout(() => { speak(cachedResponse, Date.now().toString()); }, 700);
+                return;
+            }
+        }
+
+        stopCurrentSpeech(true);
+        setBotStatus('thinking');
         try {
-            // FIX: The `sendMessage` method expects an object with a `message` property, not a plain string. This resolves error 2.
             let response = await chat.sendMessage({ message: currentInput });
             while (response.functionCalls && response.functionCalls.length > 0) {
                 const call = response.functionCalls[0]; const { name, args } = call; let result, success = false;
@@ -335,11 +376,14 @@ When returning audio + text, make it natural and expressive — use [pause], [la
                 else if (name === 'setVolume' && args.volume !== undefined) { success = setVolume(args.volume as number); result = { success, detail: `Volume set to ${args.volume}` }; }
                 
                 const functionResponse: Part[] = [{ functionResponse: { name, response: { result } } }];
-                // FIX: The `sendMessage` method expects an object with a `message` property. The `message` can be a Part array for function responses. This resolves error 3.
                 response = await chat.sendMessage({ message: functionResponse });
             }
 
             const fullText = response.text;
+            responseCacheRef.current.set(currentInput.toLowerCase(), fullText);
+            try { localStorage.setItem('fuadAssistantResponseCache', JSON.stringify(Array.from(responseCacheRef.current.entries()))); } 
+            catch (error) { console.error("Failed to save response cache:", error); }
+
             const messageParts = fullText.split(/(\[PAUSE=\d+-\d+\])/g).filter(p => p.trim());
             if (messageParts.length > 1) { storyQueueRef.current = messageParts; await processStoryQueue(); } 
             else { await speak(fullText, Date.now().toString()); }
@@ -381,8 +425,10 @@ When returning audio + text, make it natural and expressive — use [pause], [la
         const explanationBank = SECTION_EXPLANATIONS[activeSection];
         if (explanationBank) {
             if (botStatusRef.current !== 'idle') { stopCurrentSpeech(true); proactiveSpeakAndDisplay(getRandomResponse(INTERRUPTION_RESPONSES, lastInterruptionRef)); }
-            const explanation = getRandomResponse(explanationBank, { current: lastSectionExplanationRef.current[activeSection] });
-            lastSectionExplanationRef.current[activeSection] = explanation; proactiveSpeakAndDisplay(explanation); lastExplainedSectionRef.current = activeSection;
+            // FIX: Removed buggy logic for preventing repeated section explanations. The previous implementation was passing an invalid argument to getRandomResponse.
+            const explanation = getRandomResponse(explanationBank);
+            proactiveSpeakAndDisplay(explanation); 
+            lastExplainedSectionRef.current = activeSection;
         }
     }, [activeSection, stopCurrentSpeech, proactiveSpeakAndDisplay]);
     
@@ -395,13 +441,12 @@ When returning audio + text, make it natural and expressive — use [pause], [la
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, botStatus]);
     useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (!isChatOpen) return; const target = event.target as Node; const chatNode = chatWindowRef.current; const buttonNode = draggableRef.current; if (chatNode && !chatNode.contains(target) && buttonNode && !buttonNode.contains(target)) setIsChatOpen(false); }; document.addEventListener('mousedown', handleClickOutside); return () => document.removeEventListener('mousedown', handleClickOutside); }, [isChatOpen, draggableRef]);
     
-    const handleInactivity = useCallback(() => { if (botStatusRef.current !== 'idle' || !isChatOpen) return; proactiveSpeakAndDisplay(getRandomResponse(INACTIVITY_PROMPTS(user?.name))); }, [isChatOpen, proactiveSpeakAndDisplay, user]);
+    const handleInactivity = useCallback(() => { if (botStatusRef.current !== 'idle' || !isChatOpen) return; proactiveSpeakAndDisplay(getRandomResponse(INACTIVITY_PROMPTS(user?.name), lastInactivityRef)); }, [isChatOpen, proactiveSpeakAndDisplay, user]);
     useEffect(() => { const resetTimers = () => { 
         lastUserActivityRef.current = Date.now();
         if (inactivityMessageTimerRef.current) window.clearTimeout(inactivityMessageTimerRef.current);
         if (closeChatTimerRef.current) window.clearTimeout(closeChatTimerRef.current);
         inactivityMessageTimerRef.current = window.setTimeout(handleInactivity, 30000);
-        // FIX: Resolved TypeScript errors related to timer refs by ensuring consistent and correct typing.
         closeChatTimerRef.current = window.setTimeout(() => { if (document.visibilityState === 'visible') setIsChatOpen(false); }, 90000);
     }; 
     if (isChatOpen) { 
@@ -420,23 +465,32 @@ When returning audio + text, make it natural and expressive — use [pause], [la
 
     return (
         <>
-            <div ref={draggableRef} style={{ position: 'fixed', left: position.x, top: position.y, zIndex: isProfileCardOpen ? 59 : 75 }} className={`w-16 h-16 transition-all duration-300 ${isChatOpen ? 'opacity-0 scale-90 pointer-events-none' : 'assistant-enter-animate opacity-100'}`} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart} onMouseEnter={() => setIsParallaxActive(false)} onMouseLeave={() => setIsParallaxActive(true)}>
-                <button onClick={() => setIsChatOpen(prev => !prev)} className="w-full h-full rounded-full bg-gray-900/80 backdrop-blur-sm border-2 border-red-500/50 shadow-lg shadow-red-500/20 flex items-center justify-center transition-transform duration-300 hover:scale-110 relative" aria-label="Open Fuad Assistant">
+            <div ref={draggableRef} style={{ position: 'fixed', left: position.x, top: position.y, zIndex: isProfileCardOpen ? 59 : 75 }} className={`transition-all duration-300 ${isChatOpen ? 'opacity-0 scale-90 pointer-events-none' : 'assistant-enter-animate opacity-100'}`} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart} onMouseEnter={() => setIsParallaxActive(false)} onMouseLeave={() => setIsParallaxActive(true)}>
+                <button onClick={() => { setIsChatOpen(prev => !prev); if (!isChatOpen) setTextOnlyNotifications([]); }} className="w-16 h-16 rounded-full bg-gray-900/80 backdrop-blur-sm border-2 border-red-500/50 shadow-lg shadow-red-500/20 flex items-center justify-center transition-transform duration-300 hover:scale-110 relative" aria-label="Open Fuad Assistant">
                     {(botStatus === 'speaking' && !isVoiceDisabled) && <div className="assistant-waveform" />}
                     <img src={PROFILE_PIC_URL} alt="Fuad Ahmed" className="w-12 h-12 rounded-full" />
                 </button>
+                 {!isChatOpen && textOnlyNotifications.length > 0 && (
+                    <div className="absolute bottom-full right-0 mb-2 w-72 space-y-2 pointer-events-auto">
+                        {textOnlyNotifications.map(notif => (
+                            <div key={notif.id} className="message-enter bg-gray-800/90 backdrop-blur-sm border border-gray-600 text-gray-200 rounded-xl p-3 shadow-lg">
+                                <p className="text-sm">{notif.text}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
             
             {isChatOpen && (
                 <div ref={chatWindowRef} style={{ zIndex: isProfileCardOpen ? 59 : 70 }} className="fixed inset-0 flex items-end justify-center sm:justify-end p-4 pointer-events-none" onMouseEnter={() => setIsParallaxActive(false)} onMouseLeave={() => setIsParallaxActive(true)}>
                     <div className={`relative w-full max-w-md bg-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col h-[70vh] max-h-[600px] pointer-events-auto ${isWindowVisible ? 'chat-window-enter' : 'opacity-0'}`}>
                         <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-white/10">
-                            <div className="flex items-center gap-3"><img src={PROFILE_PIC_URL} alt="Fuad Assistant" className="w-10 h-10 rounded-full" /><div><h3 className="font-bold text-white">Fuad Assistant</h3><div className="flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full transition-colors ${isReady && !isVoiceDisabled ? 'bg-green-400' : 'bg-yellow-500'}`} /><p className="text-xs text-gray-400">{botStatus === 'speaking' ? 'Speaking...' : botStatus === 'thinking' ? 'Thinking...' : isReady ? 'Online' : 'Initializing...'}</p></div></div></div>
+                            <div className="flex items-center gap-3"><img src={PROFILE_PIC_URL} alt="Fuad Assistant" className="w-10 h-10 rounded-full" /><div><h3 className="font-bold text-white">Fuad Assistant</h3><div className="flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full transition-colors ${isReady && !isVoiceDisabled ? 'bg-green-400' : isVoiceDisabled ? 'bg-orange-500' : 'bg-yellow-500'}`} /><p className="text-xs text-gray-400">{botStatus === 'speaking' ? 'Speaking...' : botStatus === 'thinking' ? 'Thinking...' : isVoiceDisabled ? "Text Only" : isReady ? 'Online' : 'Initializing...'}</p></div></div></div>
                             <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white transition-colors"><CloseIcon className="w-6 h-6" /></button>
                         </div>
                         <div className="relative flex-1 p-4 overflow-y-auto space-y-4 chat-messages-container">
                             {messages.map(msg => <MessageItem key={msg.id} msg={msg} /> )}
-                            {(botStatus === 'thinking' || botStatus === 'speaking') && <ThinkingIndicator />}
+                            {(botStatus === 'thinking' || (botStatus === 'speaking' && !isVoiceDisabled)) && <ThinkingIndicator />}
                             <div ref={messagesEndRef} />
                             {isLocked && !user && ( <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 z-10 animate-fade-in"><h3 className="text-xl font-bold text-white mb-2">Session Expired</h3><p className="text-gray-300">Please log in to continue your conversation.</p></div> )}
                         </div>
