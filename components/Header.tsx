@@ -3,7 +3,7 @@ import { LOGO_URL } from '../constants';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { ProfileMenu } from './ProfileMenu';
-import { UploadIcon, BriefcaseIcon } from './Icons';
+import { UploadIcon, BriefcaseIcon, UsersIcon } from './Icons';
 
 interface HeaderProps {
   onScrollTo: (section: 'home' | 'portfolio' | 'contact' | 'about') => void;
@@ -16,10 +16,11 @@ interface HeaderProps {
   onPostJobClick: () => void;
   onExploreClick: () => void;
   onJobsClick: () => void;
+  onCommunityClick: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = (props) => {
-  const { onScrollTo, onLoginClick, onViewProfile, onEditProfile, onSearch, isReflecting, onUploadClick, onPostJobClick, onExploreClick, onJobsClick } = props;
+  const { onScrollTo, onLoginClick, onViewProfile, onEditProfile, onSearch, isReflecting, onUploadClick, onPostJobClick, onExploreClick, onJobsClick, onCommunityClick } = props;
   const { currentUser, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -94,6 +95,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
             <div className="hidden md:flex items-center space-x-8">
               <NavLink onClick={onExploreClick}>Explore</NavLink>
               <NavLink onClick={onJobsClick}>Jobs</NavLink>
+              <NavLink onClick={onCommunityClick}>Community</NavLink>
               <NavLink onClick={() => onScrollTo('portfolio')}>Portfolio</NavLink>
               <NavLink onClick={() => onScrollTo('about')}>About</NavLink>
             </div>
@@ -171,6 +173,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
           <div className="md:hidden bg-black/95 backdrop-blur-sm flex flex-col items-center space-y-6 py-8">
             <NavLink onClick={onExploreClick}>Explore</NavLink>
             <NavLink onClick={onJobsClick}>Jobs</NavLink>
+            <NavLink onClick={onCommunityClick}>Community</NavLink>
             <NavLink onClick={() => onScrollTo('portfolio')}>Portfolio</NavLink>
             <NavLink onClick={() => onScrollTo('about')}>About</NavLink>
             {!currentUser && (

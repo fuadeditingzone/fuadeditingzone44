@@ -1,136 +1,114 @@
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { db, storage } from '../firebase';
+import { collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { Post, Job, Submission } from '../types';
 
 interface MarketplaceContextType {
     posts: Post[];
     jobs: Job[];
     submissions: Submission[];
-    addPost: (post: Omit<Post, 'id' | 'views' | 'createdAt'>) => void;
-    addJob: (job: Omit<Job, 'id' | 'createdAt' | 'status' | 'hiredDesignerUsername'>) => void;
-    addSubmission: (submission: Omit<Submission, 'id' | 'submittedAt'>) => boolean;
+    addPost: (postData: Omit<Post, 'id' | 'views' | 'createdAt' | 'mediaUrl'>, mediaDataUrl: string) => Promise<void>;
+    addJob: (jobData: Omit<Job, 'id' | 'createdAt' | 'status' | 'hiredDesignerUsername'>) => Promise<void>;
+    addSubmission: (submissionData: Omit<Submission, 'id' | 'submittedAt'>) => Promise<boolean>;
     getPostsByUsername: (username: string) => Post[];
     getJobsByClientUsername: (username: string) => Job[];
     getJobById: (jobId: string) => Job | undefined;
     getSubmissionsForJob: (jobId: string) => Submission[];
     incrementPostView: (postId: string) => void;
-    hireDesignerForJob: (jobId: string, designerUsername: string) => void;
+    hireDesignerForJob: (jobId: string, designerUsername: string) => Promise<void>;
     hasSubmitted: (jobId: string, username: string) => boolean;
 }
 
 const MarketplaceContext = createContext<MarketplaceContextType | undefined>(undefined);
-
-const POSTS_DB_KEY = 'portfolioPostsDatabase';
-const JOBS_DB_KEY = 'portfolioJobsDatabase';
-const SUBMISSIONS_DB_KEY = 'portfolioSubmissionsDatabase';
 
 export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [posts, setPosts] = useState<Post[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
 
-    useEffect(() => {
+    const fetchData = useCallback(async () => {
         try {
-            const storedPosts = localStorage.getItem(POSTS_DB_KEY);
-            const storedJobs = localStorage.getItem(JOBS_DB_KEY);
-            const storedSubmissions = localStorage.getItem(SUBMISSIONS_DB_KEY);
+            const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+            const postsSnapshot = await getDocs(postsQuery);
+            setPosts(postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post)));
 
-            if (storedPosts) setPosts(JSON.parse(storedPosts));
-            if (storedJobs) setJobs(JSON.parse(storedJobs));
-            if (storedSubmissions) setSubmissions(JSON.parse(storedSubmissions));
+            const jobsQuery = query(collection(db, 'jobs'), orderBy('createdAt', 'desc'));
+            const jobsSnapshot = await getDocs(jobsQuery);
+            setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+
+            const submissionsSnapshot = await getDocs(collection(db, 'submissions'));
+            setSubmissions(submissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission)));
         } catch (error) {
-            console.error("Failed to load marketplace data from localStorage:", error);
+            console.error("Failed to fetch marketplace data from Firestore:", error);
         }
     }, []);
 
-    const persistData = (key: string, data: any) => {
-        try {
-            localStorage.setItem(key, JSON.stringify(data));
-        } catch (error) {
-            console.error(`Failed to save ${key} to localStorage:`, error);
-        }
-    };
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
-    const addPost = useCallback((postData: Omit<Post, 'id' | 'views' | 'createdAt'>) => {
-        const newPost: Post = {
+    const addPost = async (postData: Omit<Post, 'id' | 'views' | 'createdAt' | 'mediaUrl'>, mediaDataUrl: string) => {
+        const postId = `post_${Date.now()}`;
+        const storageRef = ref(storage, `posts/${postId}`);
+        const snapshot = await uploadString(storageRef, mediaDataUrl, 'data_url');
+        const mediaUrl = await getDownloadURL(snapshot.ref);
+
+        const newPost = {
             ...postData,
-            id: `post_${Date.now()}_${Math.random()}`,
+            mediaUrl,
             views: 0,
             createdAt: Date.now(),
         };
-        setPosts(prev => {
-            const updated = [...prev, newPost];
-            persistData(POSTS_DB_KEY, updated);
-            return updated;
-        });
-    }, []);
+        
+        await addDoc(collection(db, 'posts'), newPost);
+        fetchData(); // Refresh data
+    };
 
-    const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'status' | 'hiredDesignerUsername'>) => {
-        const newJob: Job = {
+    const addJob = async (jobData: Omit<Job, 'id' | 'createdAt' | 'status' | 'hiredDesignerUsername'>) => {
+        const newJob = {
             ...jobData,
-            id: `job_${Date.now()}_${Math.random()}`,
             createdAt: Date.now(),
-            status: 'open',
+            status: 'open' as const,
         };
-        setJobs(prev => {
-            const updated = [newJob, ...prev];
-            persistData(JOBS_DB_KEY, updated);
-            return updated;
-        });
-    }, []);
+        await addDoc(collection(db, 'jobs'), newJob);
+        fetchData();
+    };
 
-    const addSubmission = useCallback((submissionData: Omit<Submission, 'id' | 'submittedAt'>) => {
+    const addSubmission = async (submissionData: Omit<Submission, 'id' | 'submittedAt'>): Promise<boolean> => {
         const hasAlreadySubmitted = submissions.some(s => s.jobId === submissionData.jobId && s.designerUsername === submissionData.designerUsername);
-        if (hasAlreadySubmitted) {
-            return false;
-        }
-        const newSubmission: Submission = {
+        if (hasAlreadySubmitted) return false;
+        
+        const newSubmission = {
             ...submissionData,
-            id: `sub_${Date.now()}_${Math.random()}`,
             submittedAt: Date.now(),
         };
-        setSubmissions(prev => {
-            const updated = [...prev, newSubmission];
-            persistData(SUBMISSIONS_DB_KEY, updated);
-            return updated;
-        });
+        await addDoc(collection(db, 'submissions'), newSubmission);
+        fetchData();
         return true;
-    }, [submissions]);
+    };
 
-    const getPostsByUsername = useCallback((username: string) => {
-        return posts.filter(p => p.authorUsername === username).sort((a, b) => b.createdAt - a.createdAt);
-    }, [posts]);
+    const getPostsByUsername = (username: string) => posts.filter(p => p.authorUsername === username);
+    const getJobsByClientUsername = (username: string) => jobs.filter(j => j.clientUsername === username);
+    const getJobById = (jobId: string) => jobs.find(j => j.id === jobId);
+    const getSubmissionsForJob = (jobId: string) => submissions.filter(s => s.jobId === jobId);
 
-    const getJobsByClientUsername = useCallback((username: string) => {
-        return jobs.filter(j => j.clientUsername === username).sort((a, b) => b.createdAt - a.createdAt);
-    }, [jobs]);
-
-    const getJobById = useCallback((jobId: string) => {
-        return jobs.find(j => j.id === jobId);
-    }, [jobs]);
-
-    const getSubmissionsForJob = useCallback((jobId: string) => {
-        return submissions.filter(s => s.jobId === jobId).sort((a, b) => b.submittedAt - a.submittedAt);
-    }, [submissions]);
-
-    const incrementPostView = useCallback((postId: string) => {
-        setPosts(prev => {
-            const updated = prev.map(p => p.id === postId ? { ...p, views: p.views + 1 } : p);
-            // Do not persist immediately to avoid spamming localStorage on every view
-            return updated;
-        });
-    }, []);
+    const incrementPostView = async (postId: string) => {
+        const postRef = doc(db, 'posts', postId);
+        await updateDoc(postRef, { views: increment(1) });
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, views: p.views + 1 } : p));
+    };
     
-    const hireDesignerForJob = useCallback((jobId: string, designerUsername: string) => {
-        setJobs(prev => {
-            const updated = prev.map(j => j.id === jobId ? { ...j, status: 'in-progress' as const, hiredDesignerUsername: designerUsername } : j);
-            persistData(JOBS_DB_KEY, updated);
-            return updated;
+    const hireDesignerForJob = async (jobId: string, designerUsername: string) => {
+        const jobRef = doc(db, 'jobs', jobId);
+        await updateDoc(jobRef, {
+            status: 'in-progress' as const,
+            hiredDesignerUsername: designerUsername,
         });
-    }, []);
+        fetchData();
+    };
 
-    const hasSubmitted = useCallback((jobId: string, username: string) => {
-        return submissions.some(s => s.jobId === jobId && s.designerUsername === username);
-    }, [submissions]);
+    const hasSubmitted = (jobId: string, username: string) => submissions.some(s => s.jobId === jobId && s.designerUsername === username);
 
     const value = useMemo(() => ({
         posts,
@@ -146,7 +124,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         incrementPostView,
         hireDesignerForJob,
         hasSubmitted,
-    }), [posts, jobs, submissions, addPost, addJob, addSubmission, getPostsByUsername, getJobsByClientUsername, getJobById, getSubmissionsForJob, incrementPostView, hireDesignerForJob, hasSubmitted]);
+    }), [posts, jobs, submissions]);
 
     return (
         <MarketplaceContext.Provider value={value}>

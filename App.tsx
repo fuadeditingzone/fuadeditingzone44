@@ -26,6 +26,8 @@ import { JobsModal } from './components/JobsModal';
 import { UploadModal } from './components/UploadModal';
 import { PostJobModal } from './components/PostJobModal';
 import { JobDetailsModal } from './components/JobDetailsModal';
+import { CommunityModal } from './components/CommunityModal';
+
 
 const AUDIO_SOURCES = {
   background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
@@ -69,11 +71,12 @@ const AppContent = () => {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
   
-  // Marketplace Modal States
+  // Marketplace & Community Modal States
   const [isExploreModalOpen, setIsExploreModalOpen] = useState(false);
   const [isJobsModalOpen, setIsJobsModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isPostJobModalOpen, setIsPostJobModalOpen] = useState(false);
+  const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
   const [viewingJob, setViewingJob] = useState<Job | null>(null);
   const [viewingPost, setViewingPost] = useState<Post | null>(null);
 
@@ -136,22 +139,23 @@ const AppContent = () => {
       window.history.pushState({}, '', `/${user.username}`);
   }, []);
   
-  const viewProfileByUsername = useCallback((username: string) => {
-    const user = getUserByUsername(username);
+  const viewProfileByUsername = useCallback(async (username: string) => {
+    const user = await getUserByUsername(username);
     if (user) {
         setIsExploreModalOpen(false);
         setIsJobsModalOpen(false);
+        setIsCommunityModalOpen(false);
         if(viewingJob) setViewingJob(null);
         viewProfile(user);
     }
   }, [getUserByUsername, viewProfile, viewingJob]);
 
   useEffect(() => {
-    const handlePopState = () => {
+    const handlePopState = async () => {
         const path = window.location.pathname;
         if (path.length > 1) {
             const username = path.substring(1).toLowerCase();
-            const userToShow = getUserByUsername(username);
+            const userToShow = await getUserByUsername(username);
             if (userToShow) {
                 setViewingUser(userToShow);
                 setIsProfileModalOpen(true);
@@ -172,8 +176,8 @@ const AppContent = () => {
   }, [getUserByUsername, appState]);
 
 
-  const handleSearch = (query: string) => {
-      const results = findUsers(query);
+  const handleSearch = async (query: string) => {
+      const results = await findUsers(query);
       setSearchResults(results);
       setIsSearchResultsModalOpen(true);
   };
@@ -278,7 +282,7 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  const anyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen || isExploreModalOpen || isJobsModalOpen || isUploadModalOpen || isPostJobModalOpen || !!viewingJob || isEditProfileModalOpen;
+  const anyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isSearchResultsModalOpen || isProfileModalOpen || isExploreModalOpen || isJobsModalOpen || isUploadModalOpen || isPostJobModalOpen || !!viewingJob || isEditProfileModalOpen || isCommunityModalOpen;
   useEffect(() => { document.body.style.overflow = anyModalOpen ? 'hidden' : 'auto'; }, [anyModalOpen]);
   
   useEffect(() => {
@@ -346,7 +350,7 @@ const AppContent = () => {
           
           <Header 
               onScrollTo={scrollToSection} onLoginClick={() => setIsLoginModalOpen(true)} onViewProfile={viewProfile} onSearch={handleSearch} isReflecting={isReflecting} 
-              onUploadClick={() => setIsUploadModalOpen(true)} onPostJobClick={() => setIsPostJobModalOpen(true)} onExploreClick={() => setIsExploreModalOpen(true)} onJobsClick={() => setIsJobsModalOpen(true)} onEditProfile={() => setIsEditProfileModalOpen(true)}
+              onUploadClick={() => setIsUploadModalOpen(true)} onPostJobClick={() => setIsPostJobModalOpen(true)} onExploreClick={() => setIsExploreModalOpen(true)} onJobsClick={() => setIsJobsModalOpen(true)} onEditProfile={() => setIsEditProfileModalOpen(true)} onCommunityClick={() => setIsCommunityModalOpen(true)}
           />
           <main>
             <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
@@ -377,6 +381,8 @@ const AppContent = () => {
         {isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
         {isPostJobModalOpen && <PostJobModal onClose={() => setIsPostJobModalOpen(false)} />}
         {viewingJob && <JobDetailsModal job={viewingJob} onClose={() => setViewingJob(null)} onViewProfile={viewProfileByUsername} />}
+        {isCommunityModalOpen && <CommunityModal onClose={() => setIsCommunityModalOpen(false)} onViewProfile={viewProfileByUsername} />}
+
 
         {isLocked && !isLoginModalOpen && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>

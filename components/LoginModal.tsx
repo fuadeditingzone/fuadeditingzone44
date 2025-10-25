@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { LOGO_URL } from '../constants';
@@ -50,13 +50,12 @@ interface LoginModalProps {
 type Socials = Pick<User, 'linkedinUrl' | 'facebookUrl' | 'instagramUrl' | 'behanceUrl'>;
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSuccess }) => {
-    const { register, login, isUsernameTaken } = useUser();
+    const { currentUser, firebaseUser, handleGoogleSignIn, createUserProfile, isUsernameTaken } = useUser();
     
     const [step, setStep] = useState<'initial' | 'creating_profile'>('initial');
     const [isLoading, setIsLoading] = useState(false);
-    const [googleUser, setGoogleUser] = useState<{ email: string; name: string } | null>(null);
-
-    const [formData, setFormData] = useState<Omit<User, 'bio' | 'email' | 'avatarUrl' | keyof Socials>>({
+    
+    const [formData, setFormData] = useState<Omit<User, 'uid' | 'bio' | 'email' | 'avatarUrl' | keyof Socials>>({
         username: '', name: '', profession: '', role: 'client',
     });
     const [socials, setSocials] = useState<Socials>({
@@ -67,8 +66,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
     const [error, setError] = useState('');
     
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-    const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (firebaseUser && !currentUser) {
+            setFormData(prev => ({ ...prev, name: firebaseUser.displayName || '' }));
+            setStep('creating_profile');
+        } else if (currentUser) {
+            onClose();
+        }
+    }, [firebaseUser, currentUser, onClose]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -90,12 +98,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            setAvatarFile(file);
             const reader = new FileReader();
-            reader.onloadend = () => {
-                const result = reader.result as string;
-                setAvatarPreview(result);
-                setAvatarDataUrl(result);
-            };
+            reader.onloadend = () => setAvatarPreview(reader.result as string);
             reader.readAsDataURL(file);
         }
     };
@@ -104,49 +109,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
         fileInputRef.current?.click();
     };
 
-    const handleGoogleSignIn = async () => {
+    const onGoogleSignIn = async () => {
         setIsLoading(true);
-        setError('');
-        
-        // Simulate Google Popup and user selection
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Mocked Google user data. In a real app, this would come from the OAuth response.
-        const mockGoogleUser = { email: 'fuad.dev.portfolio@gmail.com', name: 'Fuad Ahmed' };
-
-        const existingUser = login(mockGoogleUser.email);
-        
+        await handleGoogleSignIn();
         setIsLoading(false);
-        if (existingUser) {
-            onClose();
-        } else {
-            setGoogleUser(mockGoogleUser);
-            setFormData(prev => ({ ...prev, name: mockGoogleUser.name }));
-            setStep('creating_profile');
-        }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!googleUser) { setError('An error occurred. Please try signing in again.'); return; }
+        if (!firebaseUser) { setError('An error occurred. Please try signing in again.'); return; }
         if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) { setError('Please fill in all required fields.'); return; }
-        if (isUsernameTaken(formData.username)) { setError('This username is already taken. Please choose another.'); return; }
+        
+        const usernameExists = await isUsernameTaken(formData.username);
+        if (usernameExists) {
+            setError('This username is already taken. Please choose another.');
+            return;
+        }
         
         setError('');
-        const newUserPayload: User = {
+        setIsLoading(true);
+        
+        const newUserPayload: Omit<User, 'uid' | 'email' | 'avatarUrl'> = {
             ...formData,
-            email: googleUser.email,
             bio,
-            avatarUrl: avatarDataUrl,
             ...socials,
         };
 
-        const newUser = register(newUserPayload);
+        const newUser = await createUserProfile(newUserPayload, avatarFile || undefined);
+        setIsLoading(false);
+
         if (newUser) {
             onRegisterSuccess(newUser);
             onClose();
         } else {
-            setError('This email is already registered to an account.');
+            setError('Failed to create profile. The email might already be in use.');
         }
     };
 
@@ -185,7 +181,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                                 <h2 className="text-3xl font-bold text-white mb-2">Join the Zone</h2>
                                 <p className="text-gray-400 mb-8">Sign in to unlock personalized features.</p>
                                 <button
-                                    onClick={handleGoogleSignIn}
+                                    onClick={onGoogleSignIn}
                                     disabled={isLoading}
                                     className="w-full max-w-xs mx-auto btn-glow bg-white text-gray-800 font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:bg-gray-200 transform hover:scale-105 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
@@ -201,10 +197,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                             </div>
                         )}
 
-                        {step === 'creating_profile' && googleUser && (
+                        {step === 'creating_profile' && firebaseUser && (
                             <div>
                                 <h2 className="text-2xl font-bold text-white mb-2 text-center md:text-left">Create your Profile</h2>
-                                <p className="text-gray-400 mb-4 text-center md:text-left">Signed in as <span className="font-semibold text-gray-300">{googleUser.email}</span></p>
+                                <p className="text-gray-400 mb-4 text-center md:text-left">Signed in as <span className="font-semibold text-gray-300">{firebaseUser.email}</span></p>
                                 
                                 <form onSubmit={handleSubmit} className="space-y-4 text-left">
                                     <div className="flex justify-center mb-4">
@@ -260,7 +256,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                                     </div>
 
                                     {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-                                    <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2">Create Profile</button>
+                                    <button type="submit" disabled={isLoading} className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 mt-2 disabled:opacity-70 disabled:cursor-wait">
+                                        {isLoading ? <SpinnerIcon className="w-6 h-6 mx-auto" /> : 'Create Profile'}
+                                    </button>
                                 </form>
                             </div>
                         )}

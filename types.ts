@@ -44,12 +44,13 @@ export interface ChatMessage {
 }
 
 export interface User {
+  uid: string;
   username: string;
   name: string;
   email: string;
   profession: string;
   role: 'client' | 'designer';
-  bio: string;
+  bio?: string;
   avatarUrl?: string;
   linkedinUrl?: string;
   facebookUrl?: string;
@@ -65,7 +66,7 @@ export interface Post {
   authorName: string;
   authorAvatarUrl?: string;
   type: 'image' | 'video';
-  mediaUrl: string; // for images, base64 data url. for videos, a direct link.
+  mediaUrl: string;
   thumbnailUrl?: string; // For videos
   title: string;
   description?: string;

@@ -17,7 +17,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClos
         name: user.name,
         username: user.username,
         profession: user.profession,
-        bio: user.bio,
+        bio: user.bio || '',
         linkedinUrl: user.linkedinUrl || '',
         facebookUrl: user.facebookUrl || '',
         instagramUrl: user.instagramUrl || '',
@@ -25,9 +25,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClos
     });
     
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatarUrl || null);
-    const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(user.avatarUrl);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -50,25 +51,27 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClos
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            setAvatarFile(file);
             const reader = new FileReader();
-            reader.onloadend = () => {
-                const result = reader.result as string;
-                setAvatarPreview(result);
-                setAvatarDataUrl(result);
-            };
+            reader.onloadend = () => setAvatarPreview(reader.result as string);
             reader.readAsDataURL(file);
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isUsernameTaken(formData.username, user.username)) {
+        setIsLoading(true);
+
+        const usernameExists = await isUsernameTaken(formData.username, user.uid);
+        if (usernameExists) {
             setError('This username is already taken.');
+            setIsLoading(false);
             return;
         }
         
-        const updatedPayload: Partial<User> = { ...formData, avatarUrl: avatarDataUrl };
-        const success = updateUser(user.username, updatedPayload);
+        const updatedPayload: Partial<User> = { ...formData };
+        const success = await updateUser(user.uid, updatedPayload, avatarFile || undefined);
+        setIsLoading(false);
 
         if (success) {
             onClose();
@@ -140,7 +143,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClos
 
                     {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                     <div className="pt-4">
-                        <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105">Save Changes</button>
+                        <button type="submit" disabled={isLoading} className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 disabled:opacity-70 disabled:cursor-wait">
+                            {isLoading ? 'Saving...' : 'Save Changes'}
+                        </button>
                     </div>
                 </form>
             </div>

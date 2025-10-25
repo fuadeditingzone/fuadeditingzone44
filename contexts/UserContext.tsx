@@ -1,174 +1,172 @@
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { auth, db, storage } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, collectionGroup, limit } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
 import type { User } from '../types';
 
 interface UserContextType {
     currentUser: User | null;
+    firebaseUser: FirebaseUser | null;
+    loading: boolean;
     isLocked: boolean;
-    register: (userData: User) => User | null;
-    login: (email: string) => User | null;
-    logout: () => void;
+    handleGoogleSignIn: () => Promise<void>;
+    createUserProfile: (userData: Omit<User, 'uid' | 'email'>, avatarFile?: File) => Promise<User | null>;
+    logout: () => Promise<void>;
     lockSite: () => void;
     unlockSite: () => void;
-    isUsernameTaken: (username: string, currentUsername?: string) => boolean;
-    isEmailTaken: (email: string) => boolean;
-    findUsers: (query: string) => User[];
-    getUserByUsername: (username: string) => User | undefined;
-    updateUser: (username: string, updatedData: Partial<User>) => boolean;
+    isUsernameTaken: (username: string, currentUid?: string) => Promise<boolean>;
+    findUsers: (query: string) => Promise<User[]>;
+    getUserByUsername: (username: string) => Promise<User | undefined>;
+    updateUser: (uid: string, updatedData: Partial<User>, newAvatarFile?: File) => Promise<boolean>;
+    getAllUsers: () => Promise<User[]>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-const USER_DB_KEY = 'portfolioUserDatabase';
-const CURRENT_USER_KEY = 'portfolioCurrentUser';
-
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [users, setUsers] = useState<Record<string, User>>({});
+    const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLocked, setIsLocked] = useState(false);
-    const [isInitialized, setIsInitialized] = useState(false);
-
+    const [loading, setLoading] = useState(true);
+    
     useEffect(() => {
-        try {
-            const storedUsers = localStorage.getItem(USER_DB_KEY);
-            const storedCurrentUser = localStorage.getItem(CURRENT_USER_KEY);
-            
-            if (storedUsers) {
-                setUsers(JSON.parse(storedUsers) as Record<string, User>);
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            setFirebaseUser(user);
+            if (user) {
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    setCurrentUser({ uid: user.uid, ...userDocSnap.data() } as User);
+                } else {
+                    setCurrentUser(null);
+                }
+            } else {
+                setCurrentUser(null);
             }
-            if (storedCurrentUser) {
-                setCurrentUser(JSON.parse(storedCurrentUser) as User);
-            }
-        } catch (error) {
-            console.error("Failed to load user data from local storage:", error);
-        }
-        setIsInitialized(true);
+            setLoading(false);
+        });
+        return () => unsubscribe();
     }, []);
 
-    const persistUsers = (updatedUsers: Record<string, User>) => {
+    const handleGoogleSignIn = async () => {
+        const provider = new GoogleAuthProvider();
         try {
-            localStorage.setItem(USER_DB_KEY, JSON.stringify(updatedUsers));
+            await signInWithPopup(auth, provider);
         } catch (error) {
-            console.error("Failed to save user database to local storage:", error);
+            console.error("Google Sign-In Error", error);
+        }
+    };
+    
+    const isUsernameTaken = async (username: string, currentUid?: string): Promise<boolean> => {
+        const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) return false;
+        if (currentUid && querySnapshot.docs[0].id === currentUid) return false;
+        return true;
+    };
+    
+    const createUserProfile = async (userData: Omit<User, 'uid' | 'email'>, avatarFile?: File): Promise<User | null> => {
+        if (!firebaseUser) return null;
+
+        let avatarUrl = undefined;
+        if (avatarFile) {
+            const storageRef = ref(storage, `avatars/${firebaseUser.uid}`);
+            await uploadBytes(storageRef, avatarFile);
+            avatarUrl = await getDownloadURL(storageRef);
+        }
+        
+        const newUser: User = {
+            ...userData,
+            uid: firebaseUser.uid,
+            email: firebaseUser.email!,
+            avatarUrl,
+        };
+        
+        await setDoc(doc(db, "users", firebaseUser.uid), {
+            username: newUser.username,
+            name: newUser.name,
+            email: newUser.email,
+            profession: newUser.profession,
+            role: newUser.role,
+            bio: newUser.bio || '',
+            avatarUrl: newUser.avatarUrl || '',
+            linkedinUrl: newUser.linkedinUrl || '',
+            facebookUrl: newUser.facebookUrl || '',
+            instagramUrl: newUser.instagramUrl || '',
+            behanceUrl: newUser.behanceUrl || '',
+        });
+        setCurrentUser(newUser);
+        return newUser;
+    };
+    
+    const updateUser = async (uid: string, updatedData: Partial<User>, newAvatarFile?: File): Promise<boolean> => {
+        try {
+            const userDocRef = doc(db, 'users', uid);
+            let finalUpdateData = { ...updatedData };
+
+            if (newAvatarFile) {
+                 const storageRef = ref(storage, `avatars/${uid}`);
+                 await uploadBytes(storageRef, newAvatarFile);
+                 finalUpdateData.avatarUrl = await getDownloadURL(storageRef);
+            }
+
+            await updateDoc(userDocRef, finalUpdateData);
+            
+            // Update local state
+            setCurrentUser(prev => prev ? { ...prev, ...finalUpdateData } : null);
+            return true;
+        } catch (error) {
+            console.error("Error updating user profile:", error);
+            return false;
         }
     };
 
-    const persistCurrentUser = (user: User | null) => {
-        try {
-            if (user) {
-                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-            } else {
-                localStorage.removeItem(CURRENT_USER_KEY);
-            }
-        } catch (error) {
-            console.error("Failed to save current user to local storage:", error);
-        }
-    }
+    const logout = async () => {
+        await signOut(auth);
+    };
 
-    const isUsernameTaken = useCallback((username: string, currentUsername?: string) => {
-        const usernameLower = username.toLowerCase();
-        if (currentUsername && usernameLower === currentUsername.toLowerCase()) {
-            return false;
-        }
-        return !!users[usernameLower];
-    }, [users]);
+    const lockSite = useCallback(() => { if (!currentUser) setIsLocked(true); }, [currentUser]);
+    const unlockSite = useCallback(() => setIsLocked(false), []);
 
-    const isEmailTaken = useCallback((email: string) => {
-        return Object.values(users).some((user: User) => user.email && user.email.toLowerCase() === email.toLowerCase());
-    }, [users]);
+    const findUsers = async (queryText: string): Promise<User[]> => {
+        if (!queryText) return [];
+        const q = query(collection(db, "users"), where("username", ">=", queryText.toLowerCase()), where("username", "<=", queryText.toLowerCase() + '\uf8ff'), limit(10));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+    };
 
-    const register = useCallback((userData: User): User | null => {
-        const usernameLower = userData.username.toLowerCase();
-        if (isUsernameTaken(usernameLower) || isEmailTaken(userData.email)) {
-            return null;
+    const getUserByUsername = async (username: string): Promise<User | undefined> => {
+        const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase()), limit(1));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const docData = querySnapshot.docs[0];
+            return { uid: docData.id, ...docData.data() } as User;
         }
-        const updatedUsers = { ...users, [usernameLower]: userData };
-        setUsers(updatedUsers);
-        setCurrentUser(userData);
-        persistUsers(updatedUsers);
-        persistCurrentUser(userData);
-        setIsLocked(false);
-        return userData;
-    }, [users, isUsernameTaken, isEmailTaken]);
+        return undefined;
+    };
     
-    const updateUser = useCallback((username: string, updatedData: Partial<User>): boolean => {
-        const usernameLower = username.toLowerCase();
-        const existingUser = users[usernameLower];
-        if (!existingUser) return false;
-
-        const newUsername = updatedData.username ? updatedData.username.toLowerCase() : usernameLower;
-        
-        // If username is changing, we need to move the user record
-        const updatedUsers = { ...users };
-        if (newUsername !== usernameLower) {
-            delete updatedUsers[usernameLower];
-        }
-        
-        const finalUser = { ...existingUser, ...updatedData };
-        updatedUsers[newUsername] = finalUser;
-
-        setUsers(updatedUsers);
-        persistUsers(updatedUsers);
-        
-        if (currentUser?.username.toLowerCase() === usernameLower) {
-            setCurrentUser(finalUser);
-            persistCurrentUser(finalUser);
-        }
-        return true;
-    }, [users, currentUser]);
-
-    const login = useCallback((email: string): User | null => {
-        const user = Object.values(users).find((u: User) => u.email && u.email.toLowerCase() === email.toLowerCase());
-        if (user) {
-            setCurrentUser(user);
-            persistCurrentUser(user);
-            setIsLocked(false);
-            return user;
-        }
-        return null;
-    }, [users]);
-
-    const logout = useCallback(() => {
-        setCurrentUser(null);
-        persistCurrentUser(null);
-    }, []);
-
-    const lockSite = useCallback(() => {
-        if (!currentUser) {
-            setIsLocked(true);
-        }
-    }, [currentUser]);
-
-    const unlockSite = useCallback(() => {
-        setIsLocked(false);
-    }, []);
-
-    const findUsers = useCallback((query: string) => {
-        if (!query) return [];
-        const queryLower = query.toLowerCase();
-        return Object.values(users).filter((user: User) => 
-            (user.username && user.username.toLowerCase().includes(queryLower)) ||
-            (user.name && user.name.toLowerCase().includes(queryLower))
-        );
-    }, [users]);
-
-    const getUserByUsername = useCallback((username: string) => {
-        return users[username.toLowerCase()];
-    }, [users]);
+    const getAllUsers = async (): Promise<User[]> => {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        return querySnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+    };
 
     const value = useMemo(() => ({
         currentUser,
-        isLocked: isInitialized && isLocked && !currentUser,
-        register,
-        login,
+        firebaseUser,
+        loading,
+        isLocked: isLocked && !currentUser,
+        handleGoogleSignIn,
+        createUserProfile,
         logout,
         lockSite,
         unlockSite,
         isUsernameTaken,
-        isEmailTaken,
         findUsers,
         getUserByUsername,
-        updateUser
-    }), [currentUser, isLocked, register, login, logout, lockSite, unlockSite, isUsernameTaken, isEmailTaken, findUsers, getUserByUsername, updateUser, isInitialized]);
+        updateUser,
+        getAllUsers,
+    }), [currentUser, firebaseUser, loading, isLocked]);
 
     return (
         <UserContext.Provider value={value}>

@@ -15,11 +15,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     const [description, setDescription] = useState('');
     const [tags, setTags] = useState<string[]>([]);
     const [tagInput, setTagInput] = useState('');
-    const [mediaFile, setMediaFile] = useState<File | null>(null);
+    const [mediaDataUrl, setMediaDataUrl] = useState<string | null>(null);
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
     const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
     const [error, setError] = useState('');
     const [isDragging, setIsDragging] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -35,10 +36,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
             return;
         }
         setError('');
-        setMediaFile(file);
         setMediaType(file.type.startsWith('image/') ? 'image' : 'video');
+        
         const reader = new FileReader();
-        reader.onloadend = () => setMediaPreview(reader.result as string);
+        reader.onloadend = () => {
+            const result = reader.result as string;
+            setMediaDataUrl(result);
+            setMediaPreview(result);
+        };
         reader.readAsDataURL(file);
     };
 
@@ -73,25 +78,35 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
         setTags(tags.filter(tag => tag !== tagToRemove));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser || currentUser.role !== 'designer') { setError('Only designers can upload work.'); return; }
-        if (!mediaFile || !mediaType || !mediaPreview) { setError('Please upload an image or video file.'); return; }
+        if (!mediaDataUrl || !mediaType) { setError('Please upload an image or video file.'); return; }
         if (!title.trim()) { setError('Please provide a title for your work.'); return; }
 
-        const postData: Omit<Post, 'id' | 'views' | 'createdAt'> = {
+        setIsLoading(true);
+        setError('');
+
+        const postData: Omit<Post, 'id' | 'views' | 'createdAt' | 'mediaUrl'> = {
             authorUsername: currentUser.username,
             authorName: currentUser.name,
             authorAvatarUrl: currentUser.avatarUrl,
             type: mediaType,
-            mediaUrl: mediaPreview, // Storing image as base64
-            thumbnailUrl: mediaType === 'video' ? mediaPreview : undefined,
+            thumbnailUrl: mediaType === 'video' ? mediaPreview! : undefined,
             title,
             description,
             tags,
         };
-        addPost(postData);
-        onClose();
+
+        try {
+            await addPost(postData, mediaDataUrl);
+            onClose();
+        } catch (err) {
+            console.error("Upload failed:", err);
+            setError("Failed to upload your work. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
 
@@ -143,7 +158,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
                         </div>
                         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                         <div className="pt-4">
-                            <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105">Publish</button>
+                            <button type="submit" disabled={isLoading} className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 disabled:opacity-70 disabled:cursor-wait">
+                                {isLoading ? 'Publishing...' : 'Publish'}
+                            </button>
                         </div>
                     </div>
                 </form>
