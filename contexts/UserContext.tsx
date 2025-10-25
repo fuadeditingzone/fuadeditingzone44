@@ -62,7 +62,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const userDocRef = doc(db, 'users', user.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
-                    setCurrentUser({ uid: user.uid, ...userDocSnap.data() } as User);
+                    const firestoreData = userDocSnap.data() as Omit<User, 'uid' | 'email'>;
+                    const appUser: User = {
+                        ...firestoreData,
+                        uid: user.uid,
+                        email: user.email!,
+                    };
+                    setCurrentUser(appUser);
                 } else {
                     setCurrentUser(null);
                 }
@@ -114,7 +120,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await setDoc(doc(db, "users", firebaseUser.uid), {
                 username: newUser.username,
                 name: newUser.name,
-                email: newUser.email,
+                // Do not save email to public profile
                 profession: newUser.profession,
                 role: newUser.role,
                 bio: newUser.bio || '',
@@ -142,10 +148,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                  await uploadBytes(sRef, newAvatarFile);
                  finalUpdateData.avatarUrl = await getDownloadURL(sRef);
             }
+            
+            // Ensure email is never written to the public profile
+            if ('email' in finalUpdateData) {
+                delete (finalUpdateData as Partial<User>).email;
+            }
 
             await updateDoc(userDocRef, finalUpdateData);
             
-            // Update local state
+            // Update local state, preserving the email from the auth object
             setCurrentUser(prev => prev ? { ...prev, ...finalUpdateData } : null);
             return true;
         } catch (error) {

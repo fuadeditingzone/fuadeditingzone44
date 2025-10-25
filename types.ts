@@ -17,7 +17,7 @@ export type ModalItem = GraphicWork | VideoWork;
 
 export interface SocialLink {
   name: string;
-  url: string;
+  url:string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -39,7 +39,7 @@ export interface User {
   uid: string;
   username: string;
   name: string;
-  email: string;
+  email?: string;
   profession: string;
   role: 'client' | 'designer';
   bio?: string;
