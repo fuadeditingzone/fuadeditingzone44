@@ -1,172 +1,53 @@
-import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
-import { auth, db, storage } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, collectionGroup, limit } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
+import React, { createContext, useContext, useMemo } from 'react';
+// FIX: Import User type
 import type { User } from '../types';
 
+// The User type has been removed, so the context will be simpler.
+// This is a placeholder type for the dummy context.
 interface UserContextType {
+    // FIX: Update currentUser to be User | null
     currentUser: User | null;
-    firebaseUser: FirebaseUser | null;
+    // FIX: Add firebaseUser to the type for LoginModal
+    firebaseUser: any;
     loading: boolean;
     isLocked: boolean;
     handleGoogleSignIn: () => Promise<void>;
-    createUserProfile: (userData: Omit<User, 'uid' | 'email'>, avatarFile?: File) => Promise<User | null>;
+    // FIX: Update return type for createUserProfile
+    createUserProfile: (userData: any, avatarFile?: File) => Promise<User | null>;
     logout: () => Promise<void>;
     lockSite: () => void;
     unlockSite: () => void;
     isUsernameTaken: (username: string, currentUid?: string) => Promise<boolean>;
-    findUsers: (query: string) => Promise<User[]>;
+    findUsers: (query: string) => Promise<any[]>;
+    // FIX: Update return type for getUserByUsername
     getUserByUsername: (username: string) => Promise<User | undefined>;
-    updateUser: (uid: string, updatedData: Partial<User>, newAvatarFile?: File) => Promise<boolean>;
-    getAllUsers: () => Promise<User[]>;
+    updateUser: (uid: string, updatedData: any, newAvatarFile?: File) => Promise<boolean>;
+    getAllUsers: () => Promise<any[]>;
 }
+
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [isLocked, setIsLocked] = useState(false);
-    const [loading, setLoading] = useState(true);
     
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setFirebaseUser(user);
-            if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    setCurrentUser({ uid: user.uid, ...userDocSnap.data() } as User);
-                } else {
-                    setCurrentUser(null);
-                }
-            } else {
-                setCurrentUser(null);
-            }
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    const handleGoogleSignIn = async () => {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
-    };
-    
-    const isUsernameTaken = async (username: string, currentUid?: string): Promise<boolean> => {
-        const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
-        const querySnapshot = await getDocs(q);
-        if (querySnapshot.empty) return false;
-        if (currentUid && querySnapshot.docs[0].id === currentUid) return false;
-        return true;
-    };
-    
-    const createUserProfile = async (userData: Omit<User, 'uid' | 'email'>, avatarFile?: File): Promise<User | null> => {
-        if (!firebaseUser) return null;
-        try {
-            let avatarUrl = undefined;
-            if (avatarFile) {
-                const storageRef = ref(storage, `avatars/${firebaseUser.uid}`);
-                await uploadBytes(storageRef, avatarFile);
-                avatarUrl = await getDownloadURL(storageRef);
-            }
-            
-            const newUser: User = {
-                ...userData,
-                uid: firebaseUser.uid,
-                email: firebaseUser.email!,
-                avatarUrl,
-            };
-            
-            await setDoc(doc(db, "users", firebaseUser.uid), {
-                username: newUser.username,
-                name: newUser.name,
-                email: newUser.email,
-                profession: newUser.profession,
-                role: newUser.role,
-                bio: newUser.bio || '',
-                avatarUrl: newUser.avatarUrl || '',
-                linkedinUrl: newUser.linkedinUrl || '',
-                facebookUrl: newUser.facebookUrl || '',
-                instagramUrl: newUser.instagramUrl || '',
-                behanceUrl: newUser.behanceUrl || '',
-            });
-            setCurrentUser(newUser);
-            return newUser;
-        } catch (error) {
-            console.error("Error creating user profile:", error);
-            return null;
-        }
-    };
-    
-    const updateUser = async (uid: string, updatedData: Partial<User>, newAvatarFile?: File): Promise<boolean> => {
-        try {
-            const userDocRef = doc(db, 'users', uid);
-            let finalUpdateData = { ...updatedData };
-
-            if (newAvatarFile) {
-                 const storageRef = ref(storage, `avatars/${uid}`);
-                 await uploadBytes(storageRef, newAvatarFile);
-                 finalUpdateData.avatarUrl = await getDownloadURL(storageRef);
-            }
-
-            await updateDoc(userDocRef, finalUpdateData);
-            
-            // Update local state
-            setCurrentUser(prev => prev ? { ...prev, ...finalUpdateData } : null);
-            return true;
-        } catch (error) {
-            console.error("Error updating user profile:", error);
-            return false;
-        }
-    };
-
-    const logout = async () => {
-        await signOut(auth);
-    };
-
-    const lockSite = useCallback(() => { if (!currentUser) setIsLocked(true); }, [currentUser]);
-    const unlockSite = useCallback(() => setIsLocked(false), []);
-
-    const findUsers = async (queryText: string): Promise<User[]> => {
-        if (!queryText) return [];
-        const q = query(collection(db, "users"), where("username", ">=", queryText.toLowerCase()), where("username", "<=", queryText.toLowerCase() + '\uf8ff'), limit(10));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-    };
-
-    const getUserByUsername = async (username: string): Promise<User | undefined> => {
-        const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase()), limit(1));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            const docData = querySnapshot.docs[0];
-            return { uid: docData.id, ...docData.data() } as User;
-        }
-        return undefined;
-    };
-    
-    const getAllUsers = async (): Promise<User[]> => {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        return querySnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-    };
-
+    // All Firebase logic has been removed. This provider now gives a static, "logged-out" context.
     const value = useMemo(() => ({
-        currentUser,
-        firebaseUser,
-        loading,
-        isLocked: isLocked && !currentUser,
-        handleGoogleSignIn,
-        createUserProfile,
-        logout,
-        lockSite,
-        unlockSite,
-        isUsernameTaken,
-        findUsers,
-        getUserByUsername,
-        updateUser,
-        getAllUsers,
-    }), [currentUser, firebaseUser, loading, isLocked, lockSite, unlockSite, isUsernameTaken, findUsers, getUserByUsername, updateUser, getAllUsers, handleGoogleSignIn, createUserProfile, logout]);
+        currentUser: null,
+        // FIX: Add firebaseUser to the value
+        firebaseUser: null,
+        loading: false,
+        isLocked: false,
+        handleGoogleSignIn: async () => { console.log("Login functionality has been removed."); },
+        createUserProfile: async () => { console.log("Login functionality has been removed."); return null; },
+        logout: async () => { console.log("Login functionality has been removed."); },
+        lockSite: () => {},
+        unlockSite: () => {},
+        isUsernameTaken: async () => false,
+        findUsers: async () => [],
+        getUserByUsername: async () => undefined,
+        updateUser: async () => false,
+        getAllUsers: async () => [],
+    }), []);
 
     return (
         <UserContext.Provider value={value}>

@@ -35,22 +35,21 @@ export type VfxSubTab = 'anime' | 'vfxEdits';
 
 export type Language = 'en' | 'bn' | 'hi' | 'ur';
 
+// FIX: Add missing type definitions
 export interface User {
   uid: string;
   username: string;
   name: string;
   email: string;
+  avatarUrl?: string;
   profession: string;
   role: 'client' | 'designer';
   bio?: string;
-  avatarUrl?: string;
   linkedinUrl?: string;
   facebookUrl?: string;
   instagramUrl?: string;
   behanceUrl?: string;
 }
-
-// --- Marketplace Types ---
 
 export interface Post {
   id: string;
@@ -59,26 +58,26 @@ export interface Post {
   authorAvatarUrl?: string;
   type: 'image' | 'video';
   mediaUrl: string;
-  thumbnailUrl?: string; // For videos
+  thumbnailUrl?: string;
   title: string;
-  description?: string;
+  description: string;
   tags: string[];
   views: number;
-  createdAt: number; // timestamp
+  createdAt: number;
 }
 
 export interface Job {
   id: string;
-  clientUsername: string;
-  clientName: string;
-  clientAvatarUrl?: string;
   title: string;
   description: string;
   budget: number;
   currency: string;
-  deadline: string; // e.g., '1 week', '2 weeks'
-  createdAt: number; // timestamp
-  status: 'open' | 'in-progress' | 'closed';
+  deadline: string;
+  createdAt: number;
+  status: 'open' | 'in-progress' | 'completed';
+  clientUsername: string;
+  clientName: string;
+  clientAvatarUrl?: string;
   hiredDesignerUsername?: string;
 }
 
@@ -86,8 +85,7 @@ export interface Submission {
   id: string;
   jobId: string;
   designerUsername: string;
-  designerName:string;
+  designerName: string;
   designerAvatarUrl?: string;
-  post: Post; // The full post object is submitted
-  submittedAt: number; // timestamp
+  post: Post;
 }
