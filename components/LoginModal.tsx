@@ -4,7 +4,7 @@ import type { User } from '../types';
 import { LOGO_URL } from '../constants';
 import { StreamPackageIcon, ChatBubbleIcon, VfxIcon } from './Icons';
 
-// Simple inline SVG icons for benefits list
+// Simple inline SVG icons for benefits list and form states
 const UsersIcon = ({ className }: { className?: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m-7.5-2.962A3.75 3.75 0 1 0 9.75 6.75a3.75 3.75 0 0 0-3.75 3.75m0-3.75S6.375 5.25 9.75 5.25m4.5 0s3.375 2.25 3.375 5.25m-5.012 3.785a3.75 3.75 0 1 0-7.48-1.545" />
@@ -14,6 +14,19 @@ const LockOpenIcon = ({ className }: { className?: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m.75-3a3.375 3.375 0 0 1 6.75 0v3.75" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5" />
+    </svg>
+);
+
+const SpinnerIcon = ({ className }: { className?: string }) => (
+    <svg className={`animate-spin ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
+const CheckIcon = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
     </svg>
 );
 
@@ -34,25 +47,79 @@ interface LoginModalProps {
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSuccess }) => {
     const { register, isUsernameTaken } = useUser();
+    
+    const [email, setEmail] = useState('');
+    const [sentCode, setSentCode] = useState('');
+    const [userCode, setUserCode] = useState('');
+    const [verificationStep, setVerificationStep] = useState<'email' | 'code' | 'verified'>('email');
+    const [isLoading, setIsLoading] = useState(false);
+
     const [formData, setFormData] = useState<Omit<User, 'bio'>>({
         username: '', name: '', profession: '', role: 'client',
     });
     const [bio, setBio] = useState('');
     const [error, setError] = useState('');
 
+    const isProfileFormDisabled = verificationStep !== 'verified';
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        if (name === 'username') { setFormData({ ...formData, [name]: value.replace(/\s/g, '').toLowerCase() }); } 
+        if (name === 'email') { setEmail(value); }
+        else if (name === 'userCode') { setUserCode(value); }
+        else if (name === 'username') { setFormData({ ...formData, [name]: value.replace(/\s/g, '').toLowerCase() }); } 
         else if (name === 'bio') { setBio(value); } 
         else { setFormData({ ...formData, [name]: value }); }
     };
 
     const handleProfessionTagClick = (profession: string) => {
+        if (isProfileFormDisabled) return;
         setFormData({ ...formData, profession });
+    };
+
+    const handleSendCode = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!email.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/)) {
+            setError('Please enter a valid email address.');
+            return;
+        }
+        setError('');
+        setIsLoading(true);
+
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        setSentCode(code);
+        console.log(`Verification Code (for testing): ${code}`); // Log for easy testing
+        
+        setIsLoading(false);
+        setVerificationStep('code');
+    };
+
+    const handleVerifyCode = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (userCode.length !== 6) {
+            setError('Please enter the 6-digit code.');
+            return;
+        }
+        setIsLoading(true);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+        
+        if (userCode === sentCode) {
+            setError('');
+            setIsLoading(false);
+            setVerificationStep('verified');
+        } else {
+            setError('Invalid code. Please try again.');
+            setIsLoading(false);
+        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (isProfileFormDisabled) {
+            setError('Please verify your email before creating a profile.');
+            return;
+        }
         if (!formData.username.trim() || !formData.name.trim() || !formData.profession.trim()) { setError('Please fill in all required fields.'); return; }
         if (isUsernameTaken(formData.username)) { setError('This username is already taken. Please choose another.'); return; }
         setError('');
@@ -89,7 +156,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                     <div className="w-full md:w-3/5 p-8">
                         <h2 className="text-2xl font-bold text-white mb-2 text-center md:text-left">Create your Profile</h2>
                         <p className="text-gray-400 mb-6 text-center md:text-left">It's free and only takes a minute.</p>
-                        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                        
+                        {/* --- VERIFICATION SECTION --- */}
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                                <div className="flex items-center gap-3">
+                                    <input id="email" name="email" type="email" required value={email} onChange={handleChange} disabled={verificationStep !== 'email' || isLoading} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:opacity-50" placeholder="e.g., jane@example.com"/>
+                                    {verificationStep === 'email' && (
+                                        <button onClick={handleSendCode} disabled={isLoading || !email} className="btn-glow bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-all duration-300 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-40 shrink-0">
+                                            {isLoading ? <SpinnerIcon className="w-5 h-5" /> : 'Send Code'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {verificationStep === 'code' && (
+                                <div className="animate-fade-in">
+                                    <label htmlFor="userCode" className="block text-sm font-medium text-gray-300 mb-1">Verification Code</label>
+                                    <p className="text-xs text-gray-400 mb-2">A 6-digit code has been sent to your email.</p>
+                                    <div className="flex items-center gap-3">
+                                        <input id="userCode" name="userCode" type="text" maxLength={6} required value={userCode} onChange={handleChange} disabled={isLoading} className="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:opacity-50 tracking-[.5em] text-center" placeholder="––––––"/>
+                                        <button onClick={handleVerifyCode} disabled={isLoading || userCode.length !== 6} className="btn-glow bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-all duration-300 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-40 shrink-0">
+                                            {isLoading ? <SpinnerIcon className="w-5 h-5" /> : 'Verify'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {verificationStep === 'verified' && (
+                                <div className="flex items-center justify-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg animate-fade-in">
+                                    <CheckIcon className="w-6 h-6 text-green-400" />
+                                    <span className="text-green-300 font-semibold">Email Verified! You can now create your profile.</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="border-t border-gray-700 my-6"></div>
+
+                        {/* --- PROFILE FORM SECTION --- */}
+                        <form onSubmit={handleSubmit} className={`space-y-4 text-left transition-opacity duration-500 ${isProfileFormDisabled ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                             <div>
                                 <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">Username</label>
                                 <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-red-500 transition-all">
