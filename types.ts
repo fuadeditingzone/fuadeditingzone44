@@ -35,14 +35,6 @@ export type VfxSubTab = 'anime' | 'vfxEdits';
 
 export type Language = 'en' | 'bn' | 'hi' | 'ur';
 
-export interface ChatMessage {
-  id: string;
-  text: string;
-  sender: 'user' | 'bot';
-  isFinal?: boolean;
-  component?: React.ReactNode;
-}
-
 export interface User {
   uid: string;
   username: string;

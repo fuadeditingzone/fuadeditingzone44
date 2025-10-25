@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User, Post, Job } from './types';
-import { GRAPHIC_WORKS, PROFILE_CREATION_SOUND, BACKGROUND_MUSIC_TRACKS } from './constants';
+import { GRAPHIC_WORKS, PROFILE_CREATION_SOUND } from './constants';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { MarketplaceProvider } from './contexts/MarketplaceContext';
 
@@ -16,7 +16,6 @@ import { ProfileModal } from './components/ProfileModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { OrderModal } from './components/OrderModal';
 import { ContextMenu } from './components/ContextMenu';
-import { FuadAssistant } from './components/FuadAssistant';
 import { LoginModal } from './components/LoginModal';
 import { SearchResultsModal } from './components/SearchResultsModal';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -59,8 +58,7 @@ const AppContent = () => {
   const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [excessiveMovement, setExcessiveMovement] = useState(0);
-  const [isParallaxActive, setIsParallaxActive] = useState(true);
+  const [isParallaxActive] = useState(true);
 
   // Modal States
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -69,7 +67,6 @@ const AppContent = () => {
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [newlyRegisteredUser, setNewlyRegisteredUser] = useState<User | null>(null);
   
   // Marketplace & Community Modal States
   const [isExploreModalOpen, setIsExploreModalOpen] = useState(false);
@@ -94,12 +91,8 @@ const AppContent = () => {
   const lastMousePosition = useRef({ x: 0, y: 0, time: Date.now() });
   const isStormSoundPlaying = useRef(false);
   const stormSoundFadeInterval = useRef<number | null>(null);
-  const movementIntensity = useRef(0);
-  const movementTimeout = useRef<number | null>(null);
-
-  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  
   const profileSfxRef = useRef<HTMLAudioElement | null>(null);
-  const [currentTrack, setCurrentTrack] = useState(-1);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlocked) return;
@@ -197,7 +190,6 @@ const AppContent = () => {
 
   useEffect(() => { 
     Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); 
-    const musicAudio = new Audio(); musicAudio.loop = true; musicAudioRef.current = musicAudio;
     const sfxAudio = new Audio(PROFILE_CREATION_SOUND); sfxAudio.volume = 0.7; profileSfxRef.current = sfxAudio;
   }, []);
   
@@ -219,12 +211,7 @@ const AppContent = () => {
   
   const handleMovement = useCallback((clientX: number, clientY: number) => {
       const now = Date.now(); const timeDelta = now - lastMousePosition.current.time; if (timeDelta < 10) return;
-      const distance = Math.sqrt(Math.pow(clientX - lastMousePosition.current.x, 2) + Math.pow(clientY - lastMousePosition.current.y, 2));
-      const speed = distance / timeDelta; lastMousePosition.current = { x: clientX, y: clientY, time: now };
-      if (speed > 8) { movementIntensity.current += 1; }
-      if (movementTimeout.current) clearTimeout(movementTimeout.current);
-      movementTimeout.current = window.setTimeout(() => { movementIntensity.current = Math.max(0, movementIntensity.current - 2); }, 500);
-      if (movementIntensity.current > 20) { setExcessiveMovement(c => c + 1); movementIntensity.current = 0; }
+      lastMousePosition.current = { x: clientX, y: clientY, time: now };
   }, []);
 
   useEffect(() => {
@@ -287,10 +274,10 @@ const AppContent = () => {
   
   useEffect(() => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
-    const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying; const shouldMute = isAnyVideoPlaying || currentTrack > -1;
+    const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying;
     const backgroundAudio = audioRefs.current.background;
-    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = shouldMute ? 0 : AUDIO_SOURCES.background.volume;
-  }, [modalState, isVfxVideoPlaying, currentTrack, audioUnlocked]);
+    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = isAnyVideoPlaying ? 0 : AUDIO_SOURCES.background.volume;
+  }, [modalState, isVfxVideoPlaying, audioUnlocked]);
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
     if (!audioUnlocked) unlockAudio(); else safePlay(audioRefs.current.click?.play());
@@ -322,18 +309,6 @@ const AppContent = () => {
   
   const handleRegisterSuccess = useCallback((newUser: User) => {
     if (profileSfxRef.current && audioUnlocked) { profileSfxRef.current.currentTime = 0; safePlay(profileSfxRef.current.play()); }
-    setNewlyRegisteredUser(newUser);
-  }, [audioUnlocked]);
-
-  const playMusic = useCallback((trackIndex: number) => {
-    const musicAudio = musicAudioRef.current; if (!musicAudio || !BACKGROUND_MUSIC_TRACKS[trackIndex] || !audioUnlocked) return false;
-    musicAudio.src = BACKGROUND_MUSIC_TRACKS[trackIndex].url; safePlay(musicAudio.play()); setCurrentTrack(trackIndex); return true;
-  }, [audioUnlocked]);
-  const pauseMusic = useCallback(() => { musicAudioRef.current?.pause(); setCurrentTrack(-1); return true; }, []);
-  const setVolume = useCallback((volume: number) => {
-    const newVolume = Math.max(0, Math.min(1, volume / 100)); const backgroundAudio = audioRefs.current.background;
-    const musicAudio = musicAudioRef.current;
-    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = newVolume * 0.3; if (musicAudio) musicAudio.volume = newVolume; return true;
   }, [audioUnlocked]);
 
   return (
@@ -366,9 +341,6 @@ const AppContent = () => {
           {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
           {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onQuickAction={handleQuickActionClick} onGalleryOpen={openGalleryGrid} />}
           
-          {appState === 'entered' && (
-            <FuadAssistant sectionRefs={sections} audioUnlocked={audioUnlocked} isProfileCardOpen={isProfileModalOpen} onExcessiveMovement={excessiveMovement} user={currentUser} isLocked={isLocked} setIsParallaxActive={setIsParallaxActive} newlyRegisteredUser={newlyRegisteredUser} onNewUserHandled={() => setNewlyRegisteredUser(null)} playMusic={playMusic} pauseMusic={pauseMusic} setVolume={setVolume} />
-          )}
         </div>
 
         {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={handleProfileModalClose} onEditProfile={() => setIsEditProfileModalOpen(true)} />}

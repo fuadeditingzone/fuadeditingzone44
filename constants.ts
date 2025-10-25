@@ -22,14 +22,6 @@ export const WHATSAPP_NUMBER = '8801772723595';
 
 export const PROFILE_CREATION_SOUND = 'https://www.dropbox.com/scl/fi/78emjppfcksgj0yhok7q9/sfx-hi-tech-user-interface-sound-effects-335625.mp3?rlkey=gzzcnclho2bjj309egfgwhmr0&st=pp7s7qe0&dl=1';
 
-export const BACKGROUND_MUSIC_TRACKS = [
-    { name: "Peaceful Piano", url: 'https://www.dropbox.com/scl/fi/uqrvf7mydrfa11n9rgv55/noncopyright-music-pianos-295174.mp3?rlkey=74zi5f4x7glyacyzr8w69rbnl&st=yo3ffocz&dl=0' },
-    { name: "Abstract Ambience", url: 'https://www.dropbox.com/scl/fi/roz7sxqo6men1k67dckft/abstract-background-sound-53417.mp3?rlkey=qi209t123usow0ydyrwagaah4&st=gkkfpg80&dl=0' },
-    { name: "Happy Days", url: 'https://www.dropbox.com/scl/fi/9md8faxa0ey5hxwv0zwvg/happy-days-123082.mp3?rlkey=mkw7pcu5sclu3dif6b6csmkiy&st=a1p8acox&dl=0' },
-    { name: "Beautiful Memories", url: 'https://www.dropbox.com/scl/fi/our9cwr4v5h1xq6s210uj/beautiful-memories-123086.mp3?rlkey=uqu9mcgvynosu2m1fwllqo99o&st=pgjqcror&dl=0' },
-];
-
-
 export const GRAPHIC_WORKS: GraphicWork[] = [
   // Photo Manipulation / Social Media Posts
   { id: 1, imageUrl: 'https://www.dropbox.com/scl/fi/8whz5z17ra4evztzr8tei/7cbe5e230085811.Y3JvcCwxOTk5LDE1NjQsMCwyMTc.jpg?rlkey=te4mefjp0q9xj39dzjh77swin&raw=1', category: 'Photo Manipulation' },
