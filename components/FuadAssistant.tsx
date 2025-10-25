@@ -95,14 +95,7 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const [messages, setMessages] = useState<ChatMessage[]>(() => {
         try {
             const saved = localStorage.getItem('fuadAssistantChatHistory');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.some(msg => typeof msg.component === 'object' && msg.component !== null)) {
-                    throw new Error("Chat history contains invalid non-serializable data.");
-                }
-                return parsed as ChatMessage[];
-            }
-            return [];
+            return saved ? JSON.parse(saved) : [];
         } catch (error) {
             console.error("Failed to load or parse chat history, clearing it:", error);
             localStorage.removeItem('fuadAssistantChatHistory');
@@ -339,9 +332,12 @@ Make the AI behave like a living, evolving voice — funny, sleepy, emotional, c
     
     useEffect(() => {
         try {
+            // Create a new array of messages suitable for serialization
+            // by stripping out the non-serializable 'component' property.
             const serializableMessages = messages.map(({ component, ...rest }) => rest);
             localStorage.setItem('fuadAssistantChatHistory', JSON.stringify(serializableMessages));
         } catch (error) {
+            // This catch block prevents the app from crashing if serialization fails.
             console.error("Failed to save chat history:", error);
         }
     }, [messages]);
