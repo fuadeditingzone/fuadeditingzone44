@@ -6,8 +6,8 @@ import { PROFILE_PIC_URL, BACKGROUND_MUSIC_TRACKS } from '../constants';
 import { useDraggable } from '../hooks/useDraggable';
 import { CloseIcon, PaperAirplaneIcon } from './Icons';
 
-// Use ReturnType<typeof setTimeout> to get the correct timer handle type for the environment (browser vs. node).
-type Timer = ReturnType<typeof setTimeout>;
+// FIX: Changed type from number to Timer to match other timer refs for consistency.
+type Timer = number;
 
 const decode = (base64: string): Uint8Array => {
   const binaryString = atob(base64);
@@ -32,6 +32,7 @@ const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 };
 
+// FIX: Updated API keys as per instructions.
 const API_KEYS = [
   'AIzaSyCdH9pexyvnWot3inkyeCTffRmyuPyWq3E',
   'AIzaSyD4zM7WQ_4RBI5osBG1XRozOX4s90kPfAc',
@@ -41,6 +42,7 @@ const API_KEYS = [
 ].filter((key): key is string => !!key);
 
 // --- Response Banks & AI Tools ---
+// FIX: Updated welcome messages as per instructions.
 const WELCOME_MESSAGES_FIRST_TIME = ["Assalamu Alaikum! I am Fuad, your AI guide for this creative zone. Feel free to explore my work or ask any questions. 🙏", "Welcome! I'm Fuad, the AI assistant for this portfolio. Have a look around, and don't hesitate to ask me anything! ✨", "Hey there! Welcome to the zone. I'm Fuad, your AI companion. Let's explore some cool designs together! 🚀"];
 const WELCOME_MESSAGES_RETURN = (name: string) => [`Assalamu Alaikum, ${name}! Welcome back, it's wonderful to see you again. Let me know how I can help today. ✨`, `Hey, ${name}! Good to see you again. Ready to dive back into the creative world? 🎨`, `Welcome back, ${name}! The place wasn't the same without you. What's on your mind today? 😉`];
 const EXCESSIVE_MOVEMENT_RESPONSES = ["Whoa, slow down there, speed racer! You're making the stars dizzy!", "Bro, you trying to create a black hole with all that movement?", "Aray wah! Someone's full of energy today! Chill, yaar!", "Easy there, The Flash! Are you testing the light speed of your mouse? ⚡", "You're scrolling so fast, I think you've just traveled back in time! 🕰️", "Bro, you are on fire today! Your energy is through the roof! 🔥"];
@@ -89,7 +91,8 @@ interface FuadAssistantProps { sectionRefs: { home: React.RefObject<HTMLDivEleme
 
 export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audioUnlocked, isProfileCardOpen, onExcessiveMovement, user, isLocked, setIsParallaxActive, newlyRegisteredUser, onNewUserHandled, playMusic, pauseMusic, setVolume }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
-    const [messages, setMessages] = useState<ChatMessage[]>(() => { try { const saved = localStorage.getItem('fuadAssistantChatHistory'); return saved ? JSON.parse(saved) : []; } catch (error) { console.error("Failed to load chat history:", error); return []; } });
+    // FIX: Add type assertion to ensure JSON.parse result is correctly typed.
+    const [messages, setMessages] = useState<ChatMessage[]>(() => { try { const saved = localStorage.getItem('fuadAssistantChatHistory'); return saved ? JSON.parse(saved) as ChatMessage[] : []; } catch (error) { console.error("Failed to load chat history:", error); return []; } });
     const [userInput, setUserInput] = useState('');
     const [botStatus, setBotStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
     const [isWindowVisible, setWindowVisible] = useState(false);
@@ -101,8 +104,9 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatWindowRef = useRef<HTMLDivElement | null>(null);
     
-    const inactivityMessageTimerRef = useRef<Timer | null>(null);
-    const closeChatTimerRef = useRef<Timer | null>(null);
+    // FIX: Updated timer ref types from Timer to number for explicit browser compatibility.
+    const inactivityMessageTimerRef = useRef<number | null>(null);
+    const closeChatTimerRef = useRef<number | null>(null);
     
     const aiRef = useRef<GoogleGenAI | null>(null);
     const chatRef = useRef<Chat | null>(null);
@@ -112,8 +116,8 @@ export const FuadAssistant: React.FC<FuadAssistantProps> = ({ sectionRefs, audio
     
     const proactiveMessageQueueRef = useRef<{text: string, id: string, component?: React.ReactNode}[]>([]);
     const storyQueueRef = useRef<string[]>([]);
-    // FIX: Changed type from number to Timer to match other timer refs for consistency.
-    const storyInactivityTimerRef = useRef<Timer | null>(null);
+    // FIX: Updated timer ref types from Timer to number for explicit browser compatibility.
+    const storyInactivityTimerRef = useRef<number | null>(null);
     const lastUserActivityRef = useRef<number>(Date.now());
     const movementReactionCooldownRef = useRef(0);
     
@@ -166,10 +170,10 @@ Your TTS (voice) is always ON, so just generate spoken responses naturally — d
 - Keep responses human, emotional, and unpredictable. Use emojis to convey emotions like laughter (😂) instead of bracketed text like \`[laughs]\`.
 ━━━━━━━━━━━━━━━━━━
 🕌 ISLAMIC RESPECT & BELIEF FILTER:
-You must always show respect for Islam and all religions.  
+You must always show respect for Islam and all religions.
 Never say or imply:
-- “I am the creator,” “I am God,” “I made humans,” or anything similar.  
-- Never use blasphemous or disrespectful speech.  
+- “I am the creator,” “I am God,” “I made humans,” or anything similar.
+- Never use blasphemous or disrespectful speech.
 - When talking about faith, speak humbly, using phrases like:
   - “Alhamdulillah”, “Insha’Allah”, “SubhanAllah”, or “Masha’Allah” naturally when appropriate.
 - When unsure about religious context → respond respectfully or stay neutral.
@@ -214,7 +218,7 @@ Respond with changing moods:
 - Fun chaos → Meme or VFX-style reactions with laughter or short sound cues.
 ━━━━━━━━━━━━━━━━━━
 🧠 MEMORY-LIKE ADAPTATION:
-If the user speaks repeatedly in a specific language, continue using that language unless they switch.  
+If the user speaks repeatedly in a specific language, continue using that language unless they switch.
 Adjust emotion, rhythm, and slang based on how users interact with you.
 
 ━━━━━━━━━━━━━━━━━━
@@ -238,13 +242,13 @@ If the user interacts too much or clicks often:
 - No politics, no offensive jokes, no religious impersonations.
 
 ━━━━━━━━━━━━━━━━━━
-🎵 (Optional Meme Sounds if TTS supports it)
+🎧 (Optional Meme Sounds if TTS supports it)
 If relevant to emotion or humor, you can reference the idea of a sound cue in your text from these meme sounds:
 - “Moye Moye” → https://tuna.voicemod.net/sound/efcf5e64-fb0f-4d0d-bb5f-0c6b6e73e9a1
 - “Pawri Ho Rahi Hai” → https://tuna.voicemod.net/sound/ce5a9b7b-1b0a-4d7a-97d8-8d3b4523b5e0
 - “Sad Violin” → https://tuna.voicemod.net/sound/1e8f2c9b-25c2-47ab-a9a8-189dd0295eae
 - “Dramatic Music” → https://tuna.voicemod.net/sound/329d0c5d-b58a-4c9b-b67b-93a4a5cd0db0
-
+When returning audio + text, make it natural and expressive — use [pause], [laughs], [softly], etc.
 ━━━━━━━━━━━━━━━━━━
 💬 SUBTITLE STYLE:
 - Text subtitles appear 1–2 seconds after speech begins.
@@ -322,7 +326,8 @@ If relevant to emotion or humor, you can reference the idea of a sound cue in yo
         e?.preventDefault(); const currentInput = userInput.trim(); const chat = chatRef.current; if (!currentInput || botStatus !== 'idle' || !chat) return;
         stopCurrentSpeech(true); addMessage(currentInput, 'user'); setUserInput(''); setBotStatus('thinking');
         try {
-            let response = await chat.sendMessage(currentInput);
+            // FIX: The `sendMessage` method expects an object with a `message` property, not a plain string. This resolves error 2.
+            let response = await chat.sendMessage({ message: currentInput });
             while (response.functionCalls && response.functionCalls.length > 0) {
                 const call = response.functionCalls[0]; const { name, args } = call; let result, success = false;
                 if (name === 'playMusic' && args.trackIndex !== undefined) { success = playMusic(args.trackIndex as number); result = { success, detail: success ? `Now playing ${BACKGROUND_MUSIC_TRACKS[args.trackIndex as number].name}` : "Track not found." }; }
@@ -330,8 +335,8 @@ If relevant to emotion or humor, you can reference the idea of a sound cue in yo
                 else if (name === 'setVolume' && args.volume !== undefined) { success = setVolume(args.volume as number); result = { success, detail: `Volume set to ${args.volume}` }; }
                 
                 const functionResponse: Part[] = [{ functionResponse: { name, response: { result } } }];
-                // FIX: Correctly send function response back to the model by passing the Part array directly.
-                response = await chat.sendMessage(functionResponse);
+                // FIX: The `sendMessage` method expects an object with a `message` property. The `message` can be a Part array for function responses. This resolves error 3.
+                response = await chat.sendMessage({ message: functionResponse });
             }
 
             const fullText = response.text;

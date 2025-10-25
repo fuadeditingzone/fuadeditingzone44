@@ -8,6 +8,7 @@ interface UserContextType {
     login: (email: string) => User | null;
     logout: () => void;
     lockSite: () => void;
+    unlockSite: () => void;
     isUsernameTaken: (username: string) => boolean;
     isEmailTaken: (email: string) => boolean;
     findUsers: (query: string) => User[];
@@ -31,10 +32,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const storedCurrentUser = localStorage.getItem(CURRENT_USER_KEY);
             
             if (storedUsers) {
-                setUsers(JSON.parse(storedUsers));
+                // FIX: Cast parsed JSON to ensure correct type for user database.
+                setUsers(JSON.parse(storedUsers) as Record<string, User>);
             }
             if (storedCurrentUser) {
-                setCurrentUser(JSON.parse(storedCurrentUser));
+                // FIX: Cast parsed JSON to ensure correct type for current user.
+                setCurrentUser(JSON.parse(storedCurrentUser) as User);
             }
         } catch (error) {
             console.error("Failed to load user data from local storage:", error);
@@ -108,6 +111,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [currentUser]);
 
+    const unlockSite = useCallback(() => {
+        setIsLocked(false);
+    }, []);
+
     const findUsers = useCallback((query: string) => {
         if (!query) return [];
         const queryLower = query.toLowerCase();
@@ -129,11 +136,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         lockSite,
+        unlockSite,
         isUsernameTaken,
         isEmailTaken,
         findUsers,
         getUserByUsername
-    }), [currentUser, isLocked, register, login, logout, lockSite, isUsernameTaken, isEmailTaken, findUsers, getUserByUsername, isInitialized]);
+    }), [currentUser, isLocked, register, login, logout, lockSite, unlockSite, isUsernameTaken, isEmailTaken, findUsers, getUserByUsername, isInitialized]);
 
     return (
         <UserContext.Provider value={value}>

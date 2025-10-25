@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { LOGO_URL } from '../constants';
-import { StreamPackageIcon, ChatBubbleIcon, VfxIcon, GoogleIcon } from './Icons';
+import { StreamPackageIcon, ChatBubbleIcon, VfxIcon, GoogleIcon, CloseIcon } from './Icons';
 
 // Simple inline SVG icons for benefits list and form states
 const UsersIcon = ({ className }: { className?: string }) => (
@@ -112,6 +112,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div className="perspective w-full max-w-4xl" onClick={e => e.stopPropagation()}>
                 <div className="relative bg-gray-900/80 backdrop-blur-lg border border-red-500/30 rounded-2xl shadow-2xl shadow-red-500/20 transform-style-3d animate-flip-in-3d flex flex-col md:flex-row overflow-hidden">
+                    <button 
+                        onClick={onClose}
+                        className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors z-20"
+                        aria-label="Close"
+                    >
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+
                     {/* Benefits Panel */}
                     <div className="w-full md:w-2/5 bg-black/30 p-8 flex flex-col justify-center">
                         <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mb-6" />

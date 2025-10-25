@@ -45,7 +45,7 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
 type AppState = 'welcome' | 'entering' | 'entered';
 
 const AppContent = () => {
-  const { currentUser, isLocked, lockSite, findUsers } = useUser();
+  const { currentUser, isLocked, lockSite, unlockSite, findUsers } = useUser();
   const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -129,6 +129,11 @@ const AppContent = () => {
       setIsSearchResultsModalOpen(false);
       setIsProfileModalOpen(true);
   };
+  
+  const handleLoginModalClose = useCallback(() => {
+    setIsLoginModalOpen(false);
+    unlockSite();
+  }, [unlockSite]);
 
   const scrollToSection = useCallback((section: keyof typeof sections) => {
     const sectionElement = sections[section].current;
@@ -450,7 +455,7 @@ const AppContent = () => {
       </div>
 
       {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={() => { setIsProfileModalOpen(false); setViewingUser(null); }} />}
-      {isLoginModalOpen && <LoginModal onClose={() => setIsLoginModalOpen(false)} onRegisterSuccess={handleRegisterSuccess} />}
+      {isLoginModalOpen && <LoginModal onClose={handleLoginModalClose} onRegisterSuccess={handleRegisterSuccess} />}
       {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
 
       {isLocked && !isLoginModalOpen && (
