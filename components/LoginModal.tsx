@@ -68,25 +68,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const profileSetupRef = useRef(false);
 
     useEffect(() => {
-        // If a full user profile already exists, close the modal.
         if (currentUser) {
             onClose();
             return;
         }
 
-        // If the user is authenticated via Firebase but doesn't have a profile in our app yet.
-        if (firebaseUser && !currentUser) {
-            // This effect can run multiple times in React's StrictMode.
-            // To prevent resetting user input, we only pre-fill the form if the name is not already set.
+        if (firebaseUser && !currentUser && !profileSetupRef.current) {
+            profileSetupRef.current = true; // Mark as setup has run
+
             setFormData(prev => ({
                 ...prev,
-                name: prev.name || firebaseUser.displayName || '',
+                name: firebaseUser.displayName || '',
             }));
 
-            // Similarly, only fetch the avatar if we haven't already fetched it or the user hasn't picked one.
-            if (firebaseUser.photoURL && !avatarFile && !avatarPreview) {
+            if (firebaseUser.photoURL) {
                 fetch(firebaseUser.photoURL)
                     .then(res => res.blob())
                     .then(blob => {
@@ -96,10 +94,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                     })
                     .catch(console.error);
             }
-            // Move the user to the profile creation step.
             setStep('creating_profile');
         }
-    }, [firebaseUser, currentUser, onClose, avatarFile, avatarPreview]);
+    }, [firebaseUser, currentUser, onClose]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
