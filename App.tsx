@@ -69,7 +69,6 @@ const AppContent = () => {
   const audioRefs = useRef<Record<keyof typeof AUDIO_SOURCES, HTMLAudioElement | null>>({ background: null, hover: null, click: null, profileClick: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null, welcomeExit: null });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const audioContextStarted = useRef(false);
   const canPlayMoveSound = useRef(true);
   const lastMousePosition = useRef({ x: 0, y: 0, time: Date.now() });
   const isStormSoundPlaying = useRef(false);
@@ -82,12 +81,24 @@ const AppContent = () => {
   const profileSfxRef = useRef<HTMLAudioElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState(-1);
 
-  const handleEnter = useCallback(() => {
-    safePlay(audioRefs.current.welcomeExit?.play());
-    setAppState('entering');
-    startBackgroundAudio(); 
+  const unlockAudio = useCallback(() => {
+    if (audioUnlocked) return;
+    console.log("Unlocking audio due to user interaction.");
+
+    const backgroundAudio = audioRefs.current.background;
+    if (backgroundAudio) {
+        safePlay(backgroundAudio.play());
+    }
     setAudioUnlocked(true);
-  }, []);
+  }, [audioUnlocked]);
+
+  const handleEnter = useCallback(() => {
+    if (audioUnlocked) {
+        safePlay(audioRefs.current.welcomeExit?.play());
+    }
+    setAppState('entering');
+  }, [audioUnlocked]);
+
 
   useEffect(() => {
     if (appState === 'entering') {
@@ -122,25 +133,10 @@ const AppContent = () => {
   const scrollToSection = useCallback((section: keyof typeof sections) => {
     const sectionElement = sections[section].current;
     if (sectionElement) {
-        safePlay(audioRefs.current.navClick?.play());
+        if(audioUnlocked) safePlay(audioRefs.current.navClick?.play());
         sectionElement.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [sections]);
-
-  const startBackgroundAudio = useCallback(() => {
-    if (audioContextStarted.current) return;
-    audioContextStarted.current = true;
-    const backgroundAudio = audioRefs.current.background;
-    const playPromise = backgroundAudio?.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            if ((error as DOMException).name !== 'AbortError') {
-                console.log("Audio autoplay prevented.", error);
-                audioContextStarted.current = false;
-            }
-        });
-    } else { audioContextStarted.current = false; }
-  }, []);
+  }, [sections, audioUnlocked]);
 
   useEffect(() => { 
     Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); 
@@ -155,7 +151,7 @@ const AppContent = () => {
   
   useEffect(() => {
     const handleMouseOver = (event: MouseEvent) => {
-        if (!audioContextStarted.current) return;
+        if (!audioUnlocked) return;
         const target = event.target as HTMLElement;
         if (target.closest('[data-no-hover-sound="true"]')) return;
         if (target.closest('.image-sound-hover')) {
@@ -167,7 +163,7 @@ const AppContent = () => {
     };
     document.addEventListener('mouseover', handleMouseOver);
     return () => document.removeEventListener('mouseover', handleMouseOver);
-  }, []);
+  }, [audioUnlocked]);
   
     const handleMovement = useCallback((clientX: number, clientY: number) => {
         const now = Date.now();
@@ -201,7 +197,7 @@ const AppContent = () => {
         
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
-        if (!audioContextStarted.current || !ctx) return;
+        if (!audioUnlocked || !ctx) return;
         
         const now = Date.now();
         const timeDelta = now - lastMousePosition.current.time;
@@ -259,7 +255,7 @@ const AppContent = () => {
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('touchmove', handleTouchMove);
     };
-  }, [handleMovement]);
+  }, [handleMovement, audioUnlocked]);
   
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -313,15 +309,18 @@ const AppContent = () => {
     const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying;
     const shouldMute = isAnyVideoPlaying || currentTrack > -1;
     const backgroundAudio = audioRefs.current.background;
-    if (backgroundAudio) {
+    if (backgroundAudio && audioUnlocked) {
       backgroundAudio.volume = shouldMute ? 0 : AUDIO_SOURCES.background.volume;
     }
-  }, [modalState, isVfxVideoPlaying, currentTrack]);
+  }, [modalState, isVfxVideoPlaying, currentTrack, audioUnlocked]);
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
-    if (audioContextStarted.current) {
-      safePlay(audioRefs.current.click?.play());
+    if (!audioUnlocked) {
+        unlockAudio();
+    } else {
+        safePlay(audioRefs.current.click?.play());
     }
+
     const target = e.target as HTMLElement;
     const isInteractive = target.closest('a, button');
     const isTextElement = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'].includes(target.tagName) || (target.tagName === 'SPAN' && target.childElementCount === 0);
@@ -330,7 +329,7 @@ const AppContent = () => {
         target.classList.add('animate-text-bounce');
         setTimeout(() => target.classList.remove('animate-text-bounce'), 300);
     }
-  }, []);
+  }, [audioUnlocked, unlockAudio]);
   
   const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -370,22 +369,22 @@ const AppContent = () => {
   }, [contextMenu]);
   
   const handleRegisterSuccess = useCallback((newUser: User) => {
-    if (profileSfxRef.current) {
+    if (profileSfxRef.current && audioUnlocked) {
       profileSfxRef.current.currentTime = 0;
       safePlay(profileSfxRef.current.play());
     }
     setNewlyRegisteredUser(newUser);
-  }, []);
+  }, [audioUnlocked]);
 
   // --- Music Player Controls ---
   const playMusic = useCallback((trackIndex: number) => {
     const musicAudio = musicAudioRef.current;
-    if (!musicAudio || !BACKGROUND_MUSIC_TRACKS[trackIndex]) return false;
+    if (!musicAudio || !BACKGROUND_MUSIC_TRACKS[trackIndex] || !audioUnlocked) return false;
     musicAudio.src = BACKGROUND_MUSIC_TRACKS[trackIndex].url;
     safePlay(musicAudio.play());
     setCurrentTrack(trackIndex);
     return true;
-  }, []);
+  }, [audioUnlocked]);
 
   const pauseMusic = useCallback(() => {
     musicAudioRef.current?.pause();
@@ -397,15 +396,15 @@ const AppContent = () => {
     const newVolume = Math.max(0, Math.min(1, volume / 100));
     const backgroundAudio = audioRefs.current.background;
     const musicAudio = musicAudioRef.current;
-    if (backgroundAudio) backgroundAudio.volume = newVolume * 0.3; // Keep ambient lower
+    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = newVolume * 0.3; // Keep ambient lower
     if (musicAudio) musicAudio.volume = newVolume;
     return true;
-  }, []);
+  }, [audioUnlocked]);
 
   return (
     <div className={`root-container state-${appState}`}>
       <StormyVFXBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} appState={appState} />
-      <WelcomeScreen onEnter={handleEnter} />
+      <WelcomeScreen onEnter={handleEnter} onInteraction={unlockAudio} />
       
       <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />

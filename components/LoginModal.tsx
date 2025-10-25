@@ -64,6 +64,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
+        setError('');
         if (name === 'email') { setEmail(value); }
         else if (name === 'userCode') { setUserCode(value); }
         else if (name === 'username') { setFormData({ ...formData, [name]: value.replace(/\s/g, '').toLowerCase() }); } 

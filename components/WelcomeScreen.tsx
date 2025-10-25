@@ -2,19 +2,27 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 interface WelcomeScreenProps {
     onEnter: () => void;
+    onInteraction: () => void;
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter, onInteraction }) => {
     const [showVortex, setShowVortex] = useState(true);
     const onEnterCalledRef = useRef(false);
+    const onInteractionCalledRef = useRef(false);
 
-    // Use useCallback to ensure the function identity is stable for useEffect dependencies
     const triggerEnter = useCallback(() => {
         if (!onEnterCalledRef.current) {
             onEnterCalledRef.current = true;
             onEnter();
         }
     }, [onEnter]);
+
+    const triggerInteraction = useCallback(() => {
+        if (!onInteractionCalledRef.current) {
+            onInteractionCalledRef.current = true;
+            onInteraction();
+        }
+    }, [onInteraction]);
 
     useEffect(() => {
         const vortexTimer = setTimeout(() => {
@@ -28,7 +36,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
 
         // This handler will be called on the first user interaction
         const handleInteraction = () => {
-            triggerEnter();
+            triggerInteraction(); // Unlock audio
+            triggerEnter();       // Transition UI
         };
 
         // Add event listeners that fire only once to skip the intro
@@ -48,7 +57,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
             window.removeEventListener('wheel', handleInteraction);
             window.removeEventListener('keydown', handleInteraction);
         };
-    }, [triggerEnter]);
+    }, [triggerEnter, triggerInteraction]);
 
     return (
         <div className="welcome-screen fixed inset-0 z-[100]">
