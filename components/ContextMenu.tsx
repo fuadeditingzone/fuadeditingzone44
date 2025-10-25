@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ALL_SERVICES } from '../constants';
+import { siteConfig } from '../config';
 import type { Service } from '../types';
 import { GalleryIcon, PhotoManipulationIcon, ThumbnailIcon, VfxIcon, CloseIcon } from './Icons';
 
@@ -11,7 +11,7 @@ interface ContextMenuProps {
   onGalleryOpen: () => void;
 }
 
-const mainServices = ALL_SERVICES.filter(s => s.isMain);
+const mainServices = siteConfig.content.services.all.filter(s => s.isMain);
 
 const getServiceIcon = (serviceName: string) => {
     if (serviceName.includes('Photo')) return <PhotoManipulationIcon className="w-5 h-5 mr-3 text-gray-400 group-hover:text-red-400 transition-colors" />;

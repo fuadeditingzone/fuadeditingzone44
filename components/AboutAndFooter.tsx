@@ -1,7 +1,6 @@
-
-
 import React, { useRef, useEffect } from 'react';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
+import { siteConfig } from '../config';
 
 interface AboutAndFooterProps {
     isReflecting: boolean;
@@ -31,13 +30,13 @@ export const AboutAndFooter: React.FC<AboutAndFooterProps> = ({ isReflecting }) 
         <footer ref={ref} id="about" className={`bg-black/50 pt-16 pb-6 transition-all duration-1000 ease-out ${animationClass}`}>
             <div className="container mx-auto px-6 text-center">
                 <div ref={parallaxRef}>
-                    <h2 className="text-3xl font-bold text-white mb-4 transition-all duration-300">About Fuad Editing Zone</h2>
+                    <h2 className="text-3xl font-bold text-white mb-4 transition-all duration-300">{siteConfig.content.about.title}</h2>
                     <p className="max-w-3xl mx-auto text-gray-400 mb-10">
-                        Fuad Editing Zone is the creative powerhouse of Fuad Ahmed, a passionate Graphic Designer and VFX Editor based in Sylhet, Bangladesh. With a journey that began in 2020, I specialize in transforming ideas into stunning visual realities. My expertise lies in creating captivating photo manipulations, click-worthy YouTube thumbnails, and cinematic visual effects that leave a lasting impression. I am dedicated to pushing creative boundaries and delivering high-quality, impactful work for every client.
+                        {siteConfig.content.about.paragraph}
                     </p>
                 </div>
                 <div className="border-t border-gray-800 pt-6 text-gray-500">
-                    <p>&copy; {new Date().getFullYear()} Designed & Developed by Fuad Editing Zone</p>
+                    <p>&copy; {new Date().getFullYear()} Designed & Developed by {siteConfig.branding.name}</p>
                 </div>
             </div>
         </footer>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { LOGO_URL } from '../constants';
+import { siteConfig } from '../config';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
 import { ProfileMenu } from './ProfileMenu';
@@ -29,6 +29,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const marketplaceEnabled = siteConfig.features.marketplace.enabled;
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -85,17 +86,17 @@ export const Header: React.FC<HeaderProps> = (props) => {
         <button
             onClick={handleLogoClick}
             className="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-white rounded-sm relative flex items-center gap-3"
-            aria-label="Fuad Editing Zone Logo - Go to top"
+            aria-label={`${siteConfig.branding.name} Logo - Go to top`}
             data-no-hover-sound="true"
         >
-            <img src={LOGO_URL} alt="Fuad Editing Zone Logo" className={`h-16 w-auto transition-all duration-300 ${isScrolled ? 'drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]' : ''} ${isLogoAnimating ? 'animate-logo-spin' : ''}`} />
-            <span className={`text-3d hidden sm:block font-poppins text-xl font-bold text-white transition-all duration-300 ${isScrolled ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : ''}`}>Fuad Editing Zone</span>
+            <img src={siteConfig.branding.logoUrl} alt={`${siteConfig.branding.name} Logo`} className={`h-16 w-auto transition-all duration-300 ${isScrolled ? 'drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]' : ''} ${isLogoAnimating ? 'animate-logo-spin' : ''}`} />
+            <span className={`text-3d hidden sm:block font-poppins text-xl font-bold text-white transition-all duration-300 ${isScrolled ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : ''}`}>{siteConfig.branding.name}</span>
         </button>
         <div className="flex items-center">
             <div className="hidden md:flex items-center space-x-8">
-              <NavLink onClick={onExploreClick}>Explore</NavLink>
-              <NavLink onClick={onJobsClick}>Jobs</NavLink>
-              <NavLink onClick={onCommunityClick}>Community</NavLink>
+              {marketplaceEnabled && <NavLink onClick={onExploreClick}>Explore</NavLink>}
+              {marketplaceEnabled && <NavLink onClick={onJobsClick}>Jobs</NavLink>}
+              {marketplaceEnabled && <NavLink onClick={onCommunityClick}>Community</NavLink>}
               <NavLink onClick={() => onScrollTo('portfolio')}>Portfolio</NavLink>
               <NavLink onClick={() => onScrollTo('about')}>About</NavLink>
             </div>
@@ -120,13 +121,13 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 )}
               </div>
               
-              {currentUser?.role === 'designer' && (
+              {marketplaceEnabled && currentUser?.role === 'designer' && (
                 <button onClick={onUploadClick} className="hidden md:flex items-center gap-2 bg-gray-800/50 text-gray-200 font-semibold py-2 px-4 rounded-full transition-all duration-300 hover:bg-red-600 hover:text-white transform hover:scale-105 btn-glow">
                   <UploadIcon className="w-5 h-5" />
                   Upload
                 </button>
               )}
-              {currentUser?.role === 'client' && (
+              {marketplaceEnabled && currentUser?.role === 'client' && (
                 <button onClick={onPostJobClick} className="hidden md:flex items-center gap-2 bg-gray-800/50 text-gray-200 font-semibold py-2 px-4 rounded-full transition-all duration-300 hover:bg-red-600 hover:text-white transform hover:scale-105 btn-glow">
                   <BriefcaseIcon className="w-5 h-5" />
                   Post a Job
@@ -171,9 +172,9 @@ export const Header: React.FC<HeaderProps> = (props) => {
       </nav>
       {isMenuOpen && (
           <div className="md:hidden bg-black/95 backdrop-blur-sm flex flex-col items-center space-y-6 py-8">
-            <NavLink onClick={onExploreClick}>Explore</NavLink>
-            <NavLink onClick={onJobsClick}>Jobs</NavLink>
-            <NavLink onClick={onCommunityClick}>Community</NavLink>
+            {marketplaceEnabled && <NavLink onClick={onExploreClick}>Explore</NavLink>}
+            {marketplaceEnabled && <NavLink onClick={onJobsClick}>Jobs</NavLink>}
+            {marketplaceEnabled && <NavLink onClick={onCommunityClick}>Community</NavLink>}
             <NavLink onClick={() => onScrollTo('portfolio')}>Portfolio</NavLink>
             <NavLink onClick={() => onScrollTo('about')}>About</NavLink>
             {!currentUser && (

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
 import type { User } from '../types';
-import { LOGO_URL } from '../constants';
+import { siteConfig } from '../config';
 import { StreamPackageIcon, ChatBubbleIcon, VfxIcon, GoogleIcon, CloseIcon } from './Icons';
 
 // Simple inline SVG icons for benefits list and form states
@@ -111,8 +111,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
 
     const onGoogleSignIn = async () => {
         setIsLoading(true);
-        await handleGoogleSignIn();
-        setIsLoading(false);
+        setError('');
+        try {
+            await handleGoogleSignIn();
+        } catch (err: any) {
+            console.error("Google Sign-In Error:", err);
+            if (err.code === 'auth/configuration-not-found') {
+                setError('Sign-in provider is not configured. Please enable Google Sign-In in the Firebase console.');
+            } else if (err.code === 'auth/popup-closed-by-user') {
+                setError('Sign-in cancelled. Please try again.');
+            } else {
+                setError('An unknown error occurred during sign-in.');
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -173,7 +186,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
 
                     {/* Benefits Panel */}
                     <div className="w-full md:w-2/5 bg-black/30 p-8 flex flex-col justify-center">
-                        <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mb-6" />
+                        <img src={siteConfig.branding.logoUrl} alt="Logo" className="w-16 h-16 mb-6" />
                         <h2 id="login-title" className="text-2xl font-bold text-white mb-4">Unlock the Full Experience</h2>
                         <ul className="space-y-4 text-left">
                             {benefits.map((benefit, i) => {
@@ -192,7 +205,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onRegisterSucce
                         {step === 'initial' && (
                             <div className="text-center">
                                 <h2 className="text-3xl font-bold text-white mb-2">Join the Zone</h2>
-                                <p className="text-gray-400 mb-8">Sign in to unlock personalized features.</p>
+                                <p className="text-gray-400 mb-6">Sign in to unlock personalized features.</p>
+                                {error && <p className="text-red-400 text-sm text-center mb-4 animate-fade-in">{error}</p>}
                                 <button
                                     onClick={onGoogleSignIn}
                                     disabled={isLoading}

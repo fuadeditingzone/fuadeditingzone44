@@ -1,8 +1,6 @@
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
-import { ALL_SERVICES } from '../constants';
+import { siteConfig } from '../config';
 import type { Service } from '../types';
 import { CrystalStarIcon, ThreeDotsIcon, ChevronDownIcon } from './Icons';
 
@@ -20,8 +18,8 @@ const ServiceButtonWithTooltip: React.FC<{ service: Service }> = ({ service }) =
 );
 
 export const ServicesPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-    const graphicServices = useMemo(() => ALL_SERVICES.filter(s => s.category === 'Graphic Design'), []);
-    const videoServices = useMemo(() => ALL_SERVICES.filter(s => s.category === 'Video Editing'), []);
+    const graphicServices = useMemo(() => siteConfig.content.services.all.filter(s => s.category === 'Graphic Design'), []);
+    const videoServices = useMemo(() => siteConfig.content.services.all.filter(s => s.category === 'Video Editing'), []);
     const [expandedService, setExpandedService] = useState<string | null>(null);
     const [activeFilter, setActiveFilter] = useState<'all' | 'Graphic Design' | 'Video Editing'>('all');
 
@@ -132,7 +130,7 @@ interface HomeProps {
 
 export const Home: React.FC<HomeProps> = ({ onScrollTo, onOrderNowClick, isReflecting, onServicesClick }) => {
     const [ref, isVisible] = useIntersectionObserver({ threshold: 0.3, triggerOnce: true });
-    const mainServices = useMemo(() => ALL_SERVICES.filter(s => s.isMain), []);
+    const mainServices = useMemo(() => siteConfig.content.services.all.filter(s => s.isMain), []);
     const parallaxRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -155,9 +153,9 @@ export const Home: React.FC<HomeProps> = ({ onScrollTo, onOrderNowClick, isRefle
         <section ref={ref} id="home" className="min-h-screen flex items-center justify-center bg-transparent">
             <div className="w-full text-center px-4" style={{ animation: 'main-content-appear 1s ease-out forwards' }}>
                 <div ref={parallaxRef} className={`transition-all duration-1000 ease-out ${animationClass}`}>
-                    <h1 className="text-3xl md:text-6xl font-bold font-poppins text-white tracking-tight transition-all duration-300">Graphic Designer & VFX Editor</h1>
+                    <h1 className="text-3xl md:text-6xl font-bold font-poppins text-white tracking-tight transition-all duration-300">{siteConfig.content.hero.title}</h1>
                     <p className="max-w-2xl mx-auto mt-6 text-base md:text-lg text-gray-300 font-inter">
-                        I turn concepts into clear, powerful visuals. Specializing in photo manipulation, banners, thumbnails & cinematic VFX edits.
+                        {siteConfig.content.hero.subtitle}
                     </p>
                     <div className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
                         <button onClick={() => onScrollTo('portfolio')} className="btn-glow bg-[#e50914] text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105">

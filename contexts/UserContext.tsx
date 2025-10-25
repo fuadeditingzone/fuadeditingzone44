@@ -51,11 +51,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleGoogleSignIn = async () => {
         const provider = new GoogleAuthProvider();
-        try {
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error("Google Sign-In Error", error);
-        }
+        await signInWithPopup(auth, provider);
     };
     
     const isUsernameTaken = async (username: string, currentUid?: string): Promise<boolean> => {

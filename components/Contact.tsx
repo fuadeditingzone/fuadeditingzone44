@@ -1,8 +1,6 @@
-
-
 import React, { useRef, useEffect } from 'react';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
-import { SOCIAL_LINKS } from '../constants';
+import { siteConfig } from '../config';
 import { EmailIcon } from './Icons';
 
 interface ContactProps {
@@ -13,7 +11,7 @@ interface ContactProps {
 export const Contact: React.FC<ContactProps> = ({ onEmailClick, isReflecting }) => {
     const [ref, isVisible] = useIntersectionObserver({ threshold: 0.3, triggerOnce: true });
     const animationClass = isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10';
-    const email = 'fuadeditingzone@gmail.com';
+    const email = siteConfig.branding.email;
     const parallaxRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -46,7 +44,7 @@ export const Contact: React.FC<ContactProps> = ({ onEmailClick, isReflecting }) 
                         <span className="font-semibold text-gray-300 group-hover:text-white transition-colors">{email}</span>
                     </button>
                     <div className="flex justify-center items-center gap-6 flex-wrap">
-                        {SOCIAL_LINKS.map(link => (
+                        {siteConfig.branding.socials.map(link => (
                             <a 
                                 key={link.name} 
                                 href={link.url} 

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ALL_SERVICES, WHATSAPP_NUMBER } from '../constants';
+import { siteConfig } from '../config';
 
 interface OrderModalProps {
   mode: 'whatsapp' | 'email';
@@ -19,10 +19,10 @@ export const OrderModal: React.FC<OrderModalProps> = ({ mode, onClose }) => {
         if (mode === 'whatsapp') {
             const message = `Hello, I'm interested in your "${serviceName}" service.`;
             const encodedMessage = encodeURIComponent(message);
-            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+            const whatsappUrl = `https://wa.me/${siteConfig.branding.whatsAppNumber}?text=${encodedMessage}`;
             window.open(whatsappUrl, '_blank');
         } else {
-            const email = 'fuadeditingzone@gmail.com';
+            const email = siteConfig.branding.email;
             const subject = encodeURIComponent(`Inquiry about "${serviceName}" service`);
             const body = encodeURIComponent(`Hello, I'm interested in your "${serviceName}" service.`);
             const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
@@ -40,7 +40,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ mode, onClose }) => {
             >
                 <h2 className="text-2xl font-bold mb-6 text-white">Choose a Service to Get Started</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                    {ALL_SERVICES.map(service => {
+                    {siteConfig.content.services.all.map(service => {
                         const ServiceIcon = service.icon;
                         return (
                             <button

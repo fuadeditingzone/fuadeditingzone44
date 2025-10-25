@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { GraphicWork, VideoWork, PortfolioTab, VfxSubTab } from '../types';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
 import { LazyImage } from './LazyImage';
-import { GRAPHIC_WORKS, ANIME_EDITS, VFX_EDITS } from '../constants';
+import { siteConfig } from '../config';
 import { PlayIcon, TikTokIcon, PauseIcon, VolumeOnIcon, VolumeOffIcon } from './Icons';
 
 interface PortfolioProps {
@@ -14,6 +14,8 @@ interface PortfolioProps {
     setActiveVfxSubTab: (subTab: VfxSubTab) => void;
     onVideoPlaybackChange: (isPlaying: boolean) => void;
 }
+
+const { graphicWorks, animeEdits, vfxEdits } = siteConfig.content.portfolio;
 
 // Dedicated component for the custom VFX video player
 const VfxVideoPlayer: React.FC<{
@@ -170,10 +172,10 @@ export const Portfolio: React.FC<PortfolioProps> = ({ openModal, isReflecting, a
                     <div key={category}>
                         <h3 id={`graphic-category-${category}`} className="text-3xl font-bold mb-8 tracking-wide text-center text-white transition-all duration-300 scroll-mt-24">{category === 'Photo Manipulation' ? 'Photo Manipulation / Social Media Posts' : category}</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {GRAPHIC_WORKS.filter(work => work.category === category).map((work, index) => (
+                            {graphicWorks.filter(work => work.category === category).map((work, index) => (
                                 <button key={work.id}
                                     onClick={() => {
-                                        const categoryWorks = GRAPHIC_WORKS.filter(w => w.category === category);
+                                        const categoryWorks = graphicWorks.filter(w => w.category === category);
                                         const clickedIndex = categoryWorks.findIndex(w => w.id === work.id);
                                         openModal(categoryWorks, clickedIndex);
                                     }}
@@ -235,13 +237,13 @@ export const Portfolio: React.FC<PortfolioProps> = ({ openModal, isReflecting, a
                 {activeVfxSubTab === 'anime' ? (
                     <div>
                         <h3 id="vfx-category-Anime-Edits" className="text-3xl font-bold mb-8 tracking-wide text-center text-white transition-all duration-300 scroll-mt-24">Anime Edits (YouTube)</h3>
-                        <VideoGrid videos={ANIME_EDITS} isReflecting={isReflecting} />
+                        <VideoGrid videos={animeEdits} isReflecting={isReflecting} />
                     </div>
                 ) : (
                     <div>
                         <h3 id="vfx-category-Cinematic-VFX" className="text-3xl font-bold mb-8 tracking-wide text-center text-white transition-all duration-300 scroll-mt-24">Cinematic VFX</h3>
                         <div className="flex flex-wrap justify-center gap-8">
-                           {VFX_EDITS.map(video => (
+                           {vfxEdits.map(video => (
                                 <VfxVideoPlayer 
                                     key={video.id} 
                                     video={video}

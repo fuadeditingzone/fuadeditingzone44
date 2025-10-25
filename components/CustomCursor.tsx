@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { LOGO_URL } from '../constants';
+import { siteConfig } from '../config';
 
 const createSparks = (x: number, y: number) => {
     const numSparks = 8;
@@ -109,7 +109,7 @@ export const CustomCursor: React.FC<{ isVisible: boolean }> = ({ isVisible }) =>
 
     return (
         <div ref={cursorRef} className={`custom-cursor ${finalIsVisible ? 'opacity-100' : 'opacity-0'}`}>
-            <img src={LOGO_URL} alt="cursor" className="cursor-logo" />
+            <img src={siteConfig.branding.logoUrl} alt="cursor" className="cursor-logo" />
         </div>
     );
 };

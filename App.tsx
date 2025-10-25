@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { GraphicWork, VideoWork, Service, PortfolioTab, VfxSubTab, ModalItem, User, Post, Job } from './types';
-import { GRAPHIC_WORKS, PROFILE_CREATION_SOUND } from './constants';
+import { siteConfig } from './config';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { MarketplaceProvider } from './contexts/MarketplaceContext';
 
@@ -26,20 +26,6 @@ import { UploadModal } from './components/UploadModal';
 import { PostJobModal } from './components/PostJobModal';
 import { JobDetailsModal } from './components/JobDetailsModal';
 import { CommunityModal } from './components/CommunityModal';
-
-
-const AUDIO_SOURCES = {
-  background: { src: 'https://www.dropbox.com/scl/fi/qw3lpt5irp4wzou3x68ij/space-atmospheric-background-124841.mp3?rlkey=roripitcuro099uar0kabwbb9&dl=1', volume: 0.15, loop: true },
-  hover: { src: 'https://www.dropbox.com/scl/fi/n97lcyw8wizmd52xqzvk6/ui-sounds-pack-4-12-359738-1.mp3?rlkey=hsc3o5r8njrivygvn4wqw5fwi&dl=1', volume: 1, loop: false },
-  click: { src: 'https://www.dropbox.com/scl/fi/kyhefzv1f8qbnax334rf5/anime-46068.mp3?rlkey=0mppg01wlork4wuk9d9yz23y3&dl=1', volume: 0.4, loop: false },
-  profileClick: { src: 'https://www.dropbox.com/scl/fi/bik802kmtwh60iqo6kwwj/sample_hover_subtle02_kofi_by_miraclei-364170.mp3?rlkey=i9k7olqzqhud63fmha7ilxjlu&dl=1', volume: 1, loop: false },
-  navClick: { src: 'https://www.dropbox.com/scl/fi/ldbwrq2lowpvcr7p85bar/deep-and-cinematic-woosh-sound-effect-318325.mp3?rlkey=d9sld3dksm4d4859ij8i7cgbd&dl=1', volume: 0.25, loop: false },
-  imageHover1: { src: 'https://www.dropbox.com/scl/fi/218n6slrzgy0hka3mhead/ui-sounds-pack-4-12-359738.mp3?rlkey=k9dvvo3sekx5mxj9gli27nmeo&dl=1', volume: 0.4, loop: false },
-  imageHover2: { src: 'https://www.dropbox.com/scl/fi/nwskelkksaqzp5pw1ov6s/ui-sounds-pack-5-14-359755.mp3?rlkey=aarm0y1cmotx2yek37o6mkzoi&dl=1', volume: 0.4, loop: false },
-  mouseMove: { src: 'https://www.dropbox.com/scl/fi/eyhzvfq43cgzydnr1p16z/swoosh-016-383771.mp3?rlkey=ue4q0kt7rsmyxuiz6kwefsebw&dl=1', volume: 0.2, loop: false },
-  storm: { src: 'https://www.dropbox.com/scl/fi/9q8t5vi7a81a4m8nb32gb/sounds-of-a-storm-with-wind-and-thunder-375923.mp3?rlkey=sqdjlw8dwilbg7zlwar1o5n7l&dl=1', volume: 0.6, loop: false },
-  welcomeExit: { src: 'https://www.dropbox.com/scl/fi/cosps94ob7q539morzdo9/ui-sounds-pack-2-sound-5-358890.mp3?rlkey=co0gvw2403tc2ws0dhg9eavbr&st=y564seth&dl=1', volume: 0.5, loop: false },
-};
 
 const safePlay = (mediaPromise: Promise<void> | undefined) => {
     if (mediaPromise !== undefined) {
@@ -84,7 +70,7 @@ const AppContent = () => {
   const [singleImageViewerState, setSingleImageViewerState] = useState<{ items: GraphicWork[]; currentIndex: number } | null>(null);
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTab>('graphic');
   const [activeVfxSubTab, setActiveVfxSubTab] = useState<VfxSubTab>('anime');
-  const audioRefs = useRef<Record<keyof typeof AUDIO_SOURCES, HTMLAudioElement | null>>({ background: null, hover: null, click: null, profileClick: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null, welcomeExit: null });
+  const audioRefs = useRef<Record<keyof typeof siteConfig.audio.sources, HTMLAudioElement | null>>({ background: null, hover: null, click: null, profileClick: null, navClick: null, imageHover1: null, imageHover2: null, mouseMove: null, storm: null, welcomeExit: null });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const canPlayMoveSound = useRef(true);
@@ -108,6 +94,50 @@ const AppContent = () => {
     document.body.classList.remove('state-welcome');
     document.body.classList.add('state-entered');
   }, [audioUnlocked]);
+  
+  // Effect to set up SEO meta tags from config
+  useEffect(() => {
+    document.title = siteConfig.seo.title;
+    
+    const setMeta = (name: string, content: string) => {
+      let element = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
+      if (!element) {
+        element = document.createElement('meta');
+        element.name = name;
+        document.head.appendChild(element);
+      }
+      element.content = content;
+    };
+    
+    const setProperty = (property: string, content: string) => {
+        let element = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+        if (!element) {
+            element = document.createElement('meta');
+            element.setAttribute('property', property);
+            document.head.appendChild(element);
+        }
+        element.content = content;
+    };
+    
+    setMeta('description', siteConfig.seo.description);
+    setMeta('keywords', siteConfig.seo.keywords);
+    setMeta('author', siteConfig.branding.author);
+
+    // Open Graph / Facebook
+    setProperty('og:type', 'website');
+    setProperty('og:url', siteConfig.seo.url);
+    setProperty('og:title', siteConfig.seo.title);
+    setProperty('og:description', siteConfig.seo.description);
+    setProperty('og:image', siteConfig.seo.ogImage);
+
+    // Twitter
+    setMeta('twitter:card', 'summary_large_image');
+    setProperty('twitter:url', siteConfig.seo.url);
+    setMeta('twitter:title', siteConfig.seo.title);
+    setMeta('twitter:description', siteConfig.seo.description);
+    setMeta('twitter:image', siteConfig.seo.ogImage);
+
+  }, []);
 
   useEffect(() => {
       document.body.classList.add('state-welcome');
@@ -189,8 +219,8 @@ const AppContent = () => {
   }, [sections, audioUnlocked]);
 
   useEffect(() => { 
-    Object.entries(AUDIO_SOURCES).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof AUDIO_SOURCES] = audio; }); 
-    const sfxAudio = new Audio(PROFILE_CREATION_SOUND); sfxAudio.volume = 0.7; profileSfxRef.current = sfxAudio;
+    Object.entries(siteConfig.audio.sources).forEach(([key, config]) => { const audio = new Audio(config.src); audio.volume = config.volume; if (config.loop) audio.loop = true; audio.preload = 'auto'; audio.load(); audioRefs.current[key as keyof typeof siteConfig.audio.sources] = audio; }); 
+    const sfxAudio = new Audio(siteConfig.audio.profileCreationSound); sfxAudio.volume = 0.7; profileSfxRef.current = sfxAudio;
   }, []);
   
   useEffect(() => {
@@ -226,13 +256,13 @@ const AppContent = () => {
             if (speed > 3 && !isStormSoundPlaying.current) {
                 const stormAudio = audioRefs.current.storm;
                 if (stormAudio) {
-                    isStormSoundPlaying.current = true; stormAudio.currentTime = 0; stormAudio.volume = AUDIO_SOURCES.storm.volume; safePlay(stormAudio.play());
+                    isStormSoundPlaying.current = true; stormAudio.currentTime = 0; stormAudio.volume = siteConfig.audio.sources.storm.volume; safePlay(stormAudio.play());
                     setTimeout(() => {
                         if (stormSoundFadeInterval.current) clearInterval(stormSoundFadeInterval.current);
-                        const fadeDuration = 1000; const fadeSteps = 20; const volumeStep = AUDIO_SOURCES.storm.volume / fadeSteps;
+                        const fadeDuration = 1000; const fadeSteps = 20; const volumeStep = siteConfig.audio.sources.storm.volume / fadeSteps;
                         stormSoundFadeInterval.current = window.setInterval(() => {
                             if (stormAudio.volume > volumeStep) stormAudio.volume -= volumeStep;
-                            else { if (stormSoundFadeInterval.current) clearInterval(stormSoundFadeInterval.current); stormAudio.pause(); stormAudio.volume = AUDIO_SOURCES.storm.volume; isStormSoundPlaying.current = false; }
+                            else { if (stormSoundFadeInterval.current) clearInterval(stormSoundFadeInterval.current); stormAudio.pause(); stormAudio.volume = siteConfig.audio.sources.storm.volume; isStormSoundPlaying.current = false; }
                         }, fadeDuration / fadeSteps);
                     }, 5000);
                 }
@@ -276,7 +306,7 @@ const AppContent = () => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
     const isAnyVideoPlaying = isVideoModalOpen || isVfxVideoPlaying;
     const backgroundAudio = audioRefs.current.background;
-    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = isAnyVideoPlaying ? 0 : AUDIO_SOURCES.background.volume;
+    if (backgroundAudio && audioUnlocked) backgroundAudio.volume = isAnyVideoPlaying ? 0 : siteConfig.audio.sources.background.volume;
   }, [modalState, isVfxVideoPlaying, audioUnlocked]);
 
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent<HTMLDivElement>) => {
@@ -302,7 +332,7 @@ const AppContent = () => {
   };
   
   const openGalleryGrid = () => { setIsGalleryGridOpen(true); setContextMenu(null); };
-  const openSingleImageViewer = (startIndex: number) => { setSingleImageViewerState({ items: GRAPHIC_WORKS, currentIndex: startIndex }); setIsGalleryGridOpen(false); };
+  const openSingleImageViewer = (startIndex: number) => { setSingleImageViewerState({ items: siteConfig.content.portfolio.graphicWorks, currentIndex: startIndex }); setIsGalleryGridOpen(false); };
   const openOrderModal = useCallback((mode: 'whatsapp' | 'email') => setOrderModalState({ isOpen: true, mode }), []);
 
   useEffect(() => { const handleClickOutside = (event: MouseEvent) => { if (contextMenu) setContextMenu(null); }; document.addEventListener('click', handleClickOutside); return () => document.removeEventListener('click', handleClickOutside); }, [contextMenu]);
@@ -310,6 +340,8 @@ const AppContent = () => {
   const handleRegisterSuccess = useCallback((newUser: User) => {
     if (profileSfxRef.current && audioUnlocked) { profileSfxRef.current.currentTime = 0; safePlay(profileSfxRef.current.play()); }
   }, [audioUnlocked]);
+  
+  const marketplaceEnabled = siteConfig.features.marketplace.enabled;
 
   return (
     <>
@@ -324,9 +356,20 @@ const AppContent = () => {
           <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
           
           <Header 
-              onScrollTo={scrollToSection} onLoginClick={() => setIsLoginModalOpen(true)} onViewProfile={viewProfile} onSearch={handleSearch} isReflecting={isReflecting} 
-              onUploadClick={() => setIsUploadModalOpen(true)} onPostJobClick={() => setIsPostJobModalOpen(true)} onExploreClick={() => setIsExploreModalOpen(true)} onJobsClick={() => setIsJobsModalOpen(true)} onEditProfile={() => setIsEditProfileModalOpen(true)} onCommunityClick={() => setIsCommunityModalOpen(true)}
+              onScrollTo={scrollToSection} 
+              onLoginClick={() => setIsLoginModalOpen(true)} 
+              onViewProfile={viewProfile} 
+              onSearch={handleSearch} 
+              isReflecting={isReflecting} 
+              onEditProfile={() => setIsEditProfileModalOpen(true)}
+              // Marketplace props
+              onUploadClick={() => setIsUploadModalOpen(true)} 
+              onPostJobClick={() => setIsPostJobModalOpen(true)} 
+              onExploreClick={() => setIsExploreModalOpen(true)} 
+              onJobsClick={() => setIsJobsModalOpen(true)} 
+              onCommunityClick={() => setIsCommunityModalOpen(true)}
           />
+
           <main>
             <div ref={sections.home} id="home"><Home onScrollTo={scrollToSection} onOrderNowClick={() => openOrderModal('whatsapp')} isReflecting={isReflecting} onServicesClick={() => setIsServicesPopupOpen(true)} /></div>
             <div ref={sections.portfolio} id="portfolio"><Portfolio openModal={openModal} isReflecting={isReflecting} activeTab={activePortfolioTab} setActiveTab={setActivePortfolioTab} activeVfxSubTab={activeVfxSubTab} setActiveVfxSubTab={setActiveVfxSubTab} onVideoPlaybackChange={setIsVfxVideoPlaying} /></div>
@@ -335,7 +378,7 @@ const AppContent = () => {
           <div ref={sections.about} id="about"><AboutAndFooter isReflecting={isReflecting} /></div>
           
           {modalState && <ModalViewer state={modalState} onClose={closeModal} onNext={showNext} onPrev={showPrev} />}
-          {isGalleryGridOpen && <GalleryGridModal items={GRAPHIC_WORKS} onClose={() => setIsGalleryGridOpen(false)} onImageClick={openSingleImageViewer} />}
+          {isGalleryGridOpen && <GalleryGridModal items={siteConfig.content.portfolio.graphicWorks} onClose={() => setIsGalleryGridOpen(false)} onImageClick={openSingleImageViewer} />}
           {singleImageViewerState && <ModalViewer state={singleImageViewerState} onClose={() => setSingleImageViewerState(null)} onNext={showNextInSingleImageViewer} onPrev={showPrevInSingleImageViewer} />}
           {isServicesPopupOpen && <ServicesPopup onClose={() => setIsServicesPopupOpen(false)} />}
           {orderModalState?.isOpen && <OrderModal mode={orderModalState.mode} onClose={() => setOrderModalState(null)} />}
@@ -347,14 +390,14 @@ const AppContent = () => {
         {isEditProfileModalOpen && currentUser && <EditProfileModal user={currentUser} onClose={() => setIsEditProfileModalOpen(false)} />}
         {isLoginModalOpen && <LoginModal onClose={handleLoginModalClose} onRegisterSuccess={handleRegisterSuccess} />}
         {isSearchResultsModalOpen && <SearchResultsModal users={searchResults} onViewProfile={viewProfile} onClose={() => setIsSearchResultsModalOpen(false)} />}
-
-        {isExploreModalOpen && <ExploreModal onClose={() => setIsExploreModalOpen(false)} onViewPost={setViewingPost} onViewProfile={viewProfileByUsername} />}
-        {isJobsModalOpen && <JobsModal onClose={() => setIsJobsModalOpen(false)} onViewJob={setViewingJob} onPostJobClick={() => { setIsJobsModalOpen(false); setIsPostJobModalOpen(true); }} />}
-        {isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
-        {isPostJobModalOpen && <PostJobModal onClose={() => setIsPostJobModalOpen(false)} />}
-        {viewingJob && <JobDetailsModal job={viewingJob} onClose={() => setViewingJob(null)} onViewProfile={viewProfileByUsername} />}
-        {isCommunityModalOpen && <CommunityModal onClose={() => setIsCommunityModalOpen(false)} onViewProfile={viewProfileByUsername} />}
-
+        
+        {/* Marketplace Modals (conditionally rendered) */}
+        {marketplaceEnabled && isExploreModalOpen && <ExploreModal onClose={() => setIsExploreModalOpen(false)} onViewPost={setViewingPost} onViewProfile={viewProfileByUsername} />}
+        {marketplaceEnabled && isJobsModalOpen && <JobsModal onClose={() => setIsJobsModalOpen(false)} onViewJob={setViewingJob} onPostJobClick={() => { setIsJobsModalOpen(false); setIsPostJobModalOpen(true); }} />}
+        {marketplaceEnabled && isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
+        {marketplaceEnabled && isPostJobModalOpen && <PostJobModal onClose={() => setIsPostJobModalOpen(false)} />}
+        {marketplaceEnabled && viewingJob && <JobDetailsModal job={viewingJob} onClose={() => setViewingJob(null)} onViewProfile={viewProfileByUsername} />}
+        {marketplaceEnabled && isCommunityModalOpen && <CommunityModal onClose={() => setIsCommunityModalOpen(false)} onViewProfile={viewProfileByUsername} />}
 
         {isLocked && !isLoginModalOpen && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
