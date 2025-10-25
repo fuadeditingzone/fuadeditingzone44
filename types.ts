@@ -1,4 +1,5 @@
 import React from 'react';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 export interface GraphicWork {
   id: number;
@@ -44,8 +45,11 @@ export interface ChatMessage {
 }
 
 export interface User {
+  uid: string;
   username: string;
   name: string;
+  email: string;
+  photoURL: string;
   profession: string;
   role: 'client' | 'designer';
   bio: string;

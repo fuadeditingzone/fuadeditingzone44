@@ -45,14 +45,13 @@ const safePlay = (mediaPromise: Promise<void> | undefined) => {
 type AppState = 'welcome' | 'entering' | 'entered';
 
 const AppContent = () => {
-  const { currentUser, isLocked, lockSite } = useUser();
+  const { currentUser, isProfileCreationRequired } = useUser();
   const [appState, setAppState] = useState<AppState>('welcome');
   const [isVfxVideoPlaying, setIsVfxVideoPlaying] = useState(false);
   const [excessiveMovement, setExcessiveMovement] = useState(0);
   const [isParallaxActive, setIsParallaxActive] = useState(true);
 
   // Modal States
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
@@ -84,15 +83,18 @@ const AppContent = () => {
     if (audioContextStarted.current) return;
     audioContextStarted.current = true;
     const backgroundAudio = audioRefs.current.background;
-    const playPromise = backgroundAudio?.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            if ((error as DOMException).name !== 'AbortError') {
-                console.log("Audio autoplay prevented by browser. Will start on user interaction.", error);
-                audioContextStarted.current = false;
-            }
-        });
-    } else { audioContextStarted.current = false; }
+    if (backgroundAudio) {
+      backgroundAudio.volume = AUDIO_SOURCES.background.volume;
+      const playPromise = backgroundAudio?.play();
+      if (playPromise !== undefined) {
+          playPromise.catch(error => {
+              if ((error as DOMException).name !== 'AbortError') {
+                  console.log("Audio autoplay prevented by browser. Will start on user interaction.", error);
+                  audioContextStarted.current = false;
+              }
+          });
+      } else { audioContextStarted.current = false; }
+    }
   }, []);
   
   const handleEnter = useCallback(() => {
@@ -109,15 +111,6 @@ const AppContent = () => {
       return () => clearTimeout(timer);
     }
   }, [appState]);
-
-  useEffect(() => {
-    if (currentUser || isLocked || appState !== 'entered') return;
-    const timer = setTimeout(() => {
-      lockSite();
-      setIsLoginModalOpen(true);
-    }, 10 * 60 * 1000);
-    return () => clearTimeout(timer);
-  }, [currentUser, isLocked, lockSite, appState]);
 
   const viewProfile = (user: User) => {
       setViewingUser(user);
@@ -296,7 +289,7 @@ const AppContent = () => {
   const showPrevInSingleImageViewer = useCallback(() => setSingleImageViewerState(s => s ? { ...s, currentIndex: (s.currentIndex - 1 + s.items.length) % s.items.length } : null), []);
   const [isServicesPopupOpen, setIsServicesPopupOpen] = useState(false);
   
-  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isLoginModalOpen || isProfileModalOpen || isEditProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isLoginModalOpen, isProfileModalOpen, isEditProfileModalOpen]);
+  useEffect(() => { const isAnyModalOpen = modalState || orderModalState?.isOpen || isGalleryGridOpen || !!singleImageViewerState || isServicesPopupOpen || isProfileCreationRequired || isProfileModalOpen || isEditProfileModalOpen; document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'auto'; }, [modalState, orderModalState, isGalleryGridOpen, singleImageViewerState, isServicesPopupOpen, isProfileCreationRequired, isProfileModalOpen, isEditProfileModalOpen]);
   
   useEffect(() => {
     const isVideoModalOpen = modalState && modalState.items.length > 0 && 'url' in modalState.items[0];
@@ -397,13 +390,12 @@ const AppContent = () => {
       <StormyVFXBackground onLightningFlash={triggerLightningReflection} isParallaxActive={isParallaxActive} appState={appState} />
       <WelcomeScreen onEnter={handleEnter} />
       
-      <div className={`app-content text-white relative isolate transition-all duration-500 ${isLocked ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
+      <div className={`app-content text-white relative isolate transition-all duration-500 ${isProfileCreationRequired ? 'blur-md pointer-events-none' : ''}`} onClick={handleInteraction} onTouchStart={handleInteraction} onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="fixed top-0 left-0 -z-[5] pointer-events-none" />
-        <CustomCursor isVisible={!isLocked} />
+        <CustomCursor isVisible={!isProfileCreationRequired} />
         
         <Header 
             onScrollTo={scrollToSection} 
-            onLoginClick={() => setIsLoginModalOpen(true)}
             onViewProfile={viewProfile}
             onEditProfile={() => setIsEditProfileModalOpen(true)}
             isReflecting={isReflecting} 
@@ -429,7 +421,7 @@ const AppContent = () => {
             isProfileCardOpen={isProfileModalOpen} 
             onExcessiveMovement={excessiveMovement} 
             user={currentUser} 
-            isLocked={isLocked} 
+            isLocked={isProfileCreationRequired} 
             setIsParallaxActive={setIsParallaxActive}
             newlyRegisteredUser={newlyRegisteredUser}
             onNewUserHandled={() => setNewlyRegisteredUser(null)}
@@ -441,10 +433,10 @@ const AppContent = () => {
       </div>
 
       {isProfileModalOpen && viewingUser && <ProfileModal user={viewingUser} onClose={() => { setIsProfileModalOpen(false); setViewingUser(null); }} />}
-      {isLoginModalOpen && <LoginModal onClose={() => setIsLoginModalOpen(false)} onRegisterSuccess={handleRegisterSuccess} />}
+      {isProfileCreationRequired && <LoginModal onRegisterSuccess={handleRegisterSuccess} />}
       {isEditProfileModalOpen && <EditProfileModal onClose={() => setIsEditProfileModalOpen(false)} />}
       
-      {isLocked && !isLoginModalOpen && (
+      {isProfileCreationRequired && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] animate-fade-in"></div>
       )}
     </div>

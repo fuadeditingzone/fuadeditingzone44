@@ -21,11 +21,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
             setShowVortex(false);
         }, 1500); // Vortex animation duration
 
-        // Fallback timer if the user doesn't interact
-        const enterTimer = setTimeout(() => {
-            triggerEnter();
-        }, 5500);
-
         // This handler will be called on the first user interaction
         const handleInteraction = () => {
             triggerEnter();
@@ -40,7 +35,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
         // Cleanup function to clear timers if the component unmounts
         return () => {
             clearTimeout(vortexTimer);
-            clearTimeout(enterTimer);
             // 'once' listeners remove themselves, but it's good practice to have this
             // in case the logic changes in the future.
             window.removeEventListener('mousedown', handleInteraction);

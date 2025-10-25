@@ -8,6 +8,7 @@ const USERNAME_COOLDOWN = 3 * 30 * 24 * 60 * 60 * 1000; // ~3 months in ms
 const PROFILE_COOLDOWN = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
 const formatTimeLeft = (ms: number) => {
+    if (ms <= 0) return "now";
     const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
     if (days > 1) return `${days} days`;
     const hours = Math.ceil(ms / (1000 * 60 * 60));
@@ -21,7 +22,7 @@ interface EditProfileModalProps {
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) => {
     const { currentUser, updateUser, isUsernameTaken } = useUser();
     
-    const [formData, setFormData] = useState<Omit<User, 'profileLastUpdatedAt' | 'usernameLastUpdatedAt'>>({
+    const [formData, setFormData] = useState<Omit<User, 'profileLastUpdatedAt' | 'usernameLastUpdatedAt' | 'uid' | 'email' | 'photoURL'>>({
         username: currentUser?.username || '',
         name: currentUser?.name || '',
         profession: currentUser?.profession || '',
@@ -30,6 +31,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     const { canUpdateUsername, usernameTimeLeft, canUpdateProfile, profileTimeLeft } = useMemo(() => {
         if (!currentUser) return { canUpdateUsername: false, usernameTimeLeft: 0, canUpdateProfile: false, profileTimeLeft: 0 };
@@ -55,43 +57,49 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return;
+        setIsLoading(true);
         
         const hasUsernameChanged = formData.username !== currentUser.username;
         const hasProfileChanged = formData.name !== currentUser.name || formData.profession !== currentUser.profession || formData.bio !== currentUser.bio || formData.role !== currentUser.role;
 
         if (hasUsernameChanged && !canUpdateUsername) {
             setError(`You can change your username again in ${formatTimeLeft(usernameTimeLeft)}.`);
-            return;
+            setIsLoading(false); return;
         }
         if (hasProfileChanged && !canUpdateProfile) {
             setError(`You can edit your profile again in ${formatTimeLeft(profileTimeLeft)}.`);
-            return;
+            setIsLoading(false); return;
         }
         if (!hasUsernameChanged && !hasProfileChanged) {
             setError("You haven't made any changes.");
-            return;
+            setIsLoading(false); return;
         }
-        if (hasUsernameChanged && isUsernameTaken(formData.username, currentUser.username)) {
+        if (hasUsernameChanged && await isUsernameTaken(formData.username)) {
             setError('This username is already taken. Please choose another.');
-            return;
+            setIsLoading(false); return;
         }
 
         setError('');
         setSuccess('');
 
         const updatePayload: Partial<User> = {};
-        if (hasUsernameChanged) updatePayload.username = formData.username;
+        if (hasUsernameChanged) {
+            updatePayload.username = formData.username;
+            updatePayload.usernameLastUpdatedAt = Date.now();
+        }
         if (hasProfileChanged) {
             updatePayload.name = formData.name;
             updatePayload.profession = formData.profession;
             updatePayload.bio = formData.bio;
             updatePayload.role = formData.role;
+            updatePayload.profileLastUpdatedAt = Date.now();
         }
         
-        const success = updateUser(updatePayload);
+        const success = await updateUser(updatePayload);
+        setIsLoading(false);
         if (success) {
             setSuccess('Profile updated successfully!');
             setTimeout(onClose, 1500);
@@ -144,7 +152,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                             
                             <div className="flex gap-4 pt-4">
                                 <button type="button" onClick={onClose} className="w-full btn-glow bg-gray-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-gray-700 transform hover:scale-105">Cancel</button>
-                                <button type="submit" className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105">Save Changes</button>
+                                <button type="submit" disabled={isLoading} className="w-full btn-glow bg-red-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 disabled:bg-gray-600 disabled:cursor-not-allowed">{isLoading ? 'Saving...' : 'Save Changes'}</button>
                             </div>
                         </form>
                     </div>

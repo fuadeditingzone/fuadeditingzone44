@@ -6,14 +6,13 @@ import { ProfileMenu } from './ProfileMenu';
 
 interface HeaderProps {
   onScrollTo: (section: 'home' | 'portfolio' | 'contact' | 'about') => void;
-  onLoginClick: () => void;
   onViewProfile: (user: User) => void;
   onEditProfile: () => void;
   isReflecting: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onViewProfile, onEditProfile, isReflecting }) => {
-  const { currentUser, logout } = useUser();
+export const Header: React.FC<HeaderProps> = ({ onScrollTo, onViewProfile, onEditProfile, isReflecting }) => {
+  const { currentUser, login, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoAnimating, setIsLogoAnimating] = useState(false);
@@ -77,12 +76,10 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
               <div className="relative">
                 {currentUser ? (
                   <button onClick={() => setIsProfileMenuOpen(p => !p)} className="flex-shrink-0" aria-label="Open profile menu">
-                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center border-2 border-gray-600 hover:border-red-500 transition-all duration-300 glow-shadow-sm transform hover:scale-110">
-                      <span className="text-xl font-bold text-white">{currentUser.name.charAt(0).toUpperCase()}</span>
-                    </div>
+                    <img src={currentUser.photoURL} alt={currentUser.name} className="w-12 h-12 rounded-full object-cover border-2 border-gray-600 hover:border-red-500 transition-all duration-300 glow-shadow-sm transform hover:scale-110" />
                   </button>
                 ) : (
-                  <button onClick={onLoginClick} className="hidden md:block bg-red-600 text-white font-bold py-2 px-5 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 btn-glow">
+                  <button onClick={login} className="hidden md:block bg-red-600 text-white font-bold py-2 px-5 rounded-full transition-all duration-300 hover:bg-red-700 transform hover:scale-105 btn-glow">
                       Login
                   </button>
                 )}
@@ -111,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({ onScrollTo, onLoginClick, onView
             <NavLink section="about">About</NavLink>
             <NavLink section="contact">Contact</NavLink>
             {!currentUser && (
-              <button onClick={() => { onLoginClick(); setIsMenuOpen(false); }} className="text-gray-300 hover:text-white transition-colors duration-300 text-lg">Login</button>
+              <button onClick={() => { login(); setIsMenuOpen(false); }} className="text-gray-300 hover:text-white transition-colors duration-300 text-lg">Login</button>
             )}
           </div>
       )}

@@ -1,137 +1,149 @@
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import type { User } from '../types';
+import { auth, db, storage, firebaseInitialized } from '../firebase';
+import { GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface UserContextType {
     currentUser: User | null;
-    isLocked: boolean;
-    register: (userData: Omit<User, 'profileLastUpdatedAt' | 'usernameLastUpdatedAt'>) => User | null;
-    updateUser: (updatedData: Partial<User>) => boolean;
+    isAuthLoading: boolean;
+    isProfileCreationRequired: boolean;
+    login: () => void;
     logout: () => void;
-    lockSite: () => void;
-    isUsernameTaken: (username: string, currentUsername?: string) => boolean;
+    register: (profileData: Omit<User, 'uid' | 'email' | 'photoURL'>, photoFile?: File) => Promise<User | null>;
+    updateUser: (updatedData: Partial<User>) => Promise<boolean>;
+    isUsernameTaken: (username: string) => Promise<boolean>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-const USER_DB_KEY = 'portfolioUserDatabase';
-const CURRENT_USER_KEY = 'portfolioCurrentUser';
-
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [users, setUsers] = useState<Record<string, User>>({});
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [isLocked, setIsLocked] = useState(false);
-    const [isInitialized, setIsInitialized] = useState(false);
+    const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [isProfileCreationRequired, setIsProfileCreationRequired] = useState(false);
+
+    const checkUserProfile = useCallback(async (user: FirebaseUser) => {
+        const userRef = doc(db!, "users", user.uid);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            setCurrentUser(docSnap.data() as User);
+            setIsProfileCreationRequired(false);
+        } else {
+            setCurrentUser(null);
+            setIsProfileCreationRequired(true);
+        }
+    }, []);
 
     useEffect(() => {
-        try {
-            const storedUsers = localStorage.getItem(USER_DB_KEY);
-            const storedCurrentUser = localStorage.getItem(CURRENT_USER_KEY);
-            
-            if (storedUsers) {
-                setUsers(JSON.parse(storedUsers));
-            }
-            if (storedCurrentUser) {
-                setCurrentUser(JSON.parse(storedCurrentUser));
-            }
-        } catch (error) {
-            console.error("Failed to load user data from local storage:", error);
+        if (!firebaseInitialized || !auth) {
+            setIsAuthLoading(false);
+            return;
         }
-        setIsInitialized(true);
+
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                setFirebaseUser(user);
+                await checkUserProfile(user);
+            } else {
+                setFirebaseUser(null);
+                setCurrentUser(null);
+                setIsProfileCreationRequired(false);
+            }
+            setIsAuthLoading(false);
+        });
+
+        getRedirectResult(auth).catch(error => {
+            console.error("Error getting redirect result:", error);
+            setIsAuthLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [checkUserProfile]);
+
+    const login = useCallback(() => {
+        if (!auth) return;
+        const provider = new GoogleAuthProvider();
+        signInWithRedirect(auth, provider);
     }, []);
 
-    const persistUsers = (updatedUsers: Record<string, User>) => {
+    const logout = useCallback(async () => {
+        if (!auth) return;
         try {
-            localStorage.setItem(USER_DB_KEY, JSON.stringify(updatedUsers));
+            await signOut(auth);
+            setCurrentUser(null);
+            setFirebaseUser(null);
         } catch (error) {
-            console.error("Failed to save user database to local storage:", error);
+            console.error("Error signing out: ", error);
         }
-    };
+    }, []);
 
-    const persistCurrentUser = (user: User | null) => {
+    const isUsernameTaken = useCallback(async (username: string): Promise<boolean> => {
+        if (!db) return false;
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("username", "==", username.toLowerCase()));
+        const querySnapshot = await getDocs(q);
+        return !querySnapshot.empty;
+    }, []);
+    
+    const register = useCallback(async (profileData: Omit<User, 'uid'|'email'|'photoURL'>, photoFile?: File): Promise<User | null> => {
+        if (!db || !firebaseUser) return null;
+
+        let photoURL = firebaseUser.photoURL || '';
+        if (photoFile) {
+            const storageRef = ref(storage!, `profile-pictures/${firebaseUser.uid}`);
+            await uploadBytes(storageRef, photoFile);
+            photoURL = await getDownloadURL(storageRef);
+        }
+
+        const now = Date.now();
+        const newUser: User = {
+            ...profileData,
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            photoURL: photoURL,
+            username: profileData.username.toLowerCase(),
+            profileLastUpdatedAt: now,
+            usernameLastUpdatedAt: now,
+        };
+
         try {
-            if (user) {
-                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-            } else {
-                localStorage.removeItem(CURRENT_USER_KEY);
-            }
+            await setDoc(doc(db, "users", firebaseUser.uid), newUser);
+            setCurrentUser(newUser);
+            setIsProfileCreationRequired(false);
+            return newUser;
         } catch (error) {
-            console.error("Failed to save current user to local storage:", error);
-        }
-    }
-
-    const isUsernameTaken = useCallback((username: string, currentUsername?: string) => {
-        const usernameLower = username.toLowerCase();
-        if (currentUsername && currentUsername.toLowerCase() === usernameLower) {
-            return false;
-        }
-        return !!users[usernameLower];
-    }, [users]);
-
-    const register = useCallback((userData: Omit<User, 'profileLastUpdatedAt' | 'usernameLastUpdatedAt'>): User | null => {
-        const usernameLower = userData.username.toLowerCase();
-        if (isUsernameTaken(usernameLower)) {
+            console.error("Error creating profile:", error);
             return null;
         }
-        const now = Date.now();
-        const newUser: User = { ...userData, profileLastUpdatedAt: now, usernameLastUpdatedAt: now };
-        const updatedUsers = { ...users, [usernameLower]: newUser };
+    }, [firebaseUser]);
+
+    const updateUser = useCallback(async (updatedData: Partial<User>): Promise<boolean> => {
+        if (!db || !currentUser) return false;
         
-        setUsers(updatedUsers);
-        setCurrentUser(newUser);
-        persistUsers(updatedUsers);
-        persistCurrentUser(newUser);
-        setIsLocked(false);
-        return newUser;
-    }, [users, isUsernameTaken]);
-
-    const updateUser = useCallback((updatedData: Partial<User>): boolean => {
-        if (!currentUser) return false;
-
-        const oldUsernameLower = currentUser.username.toLowerCase();
-        const newUsernameLower = updatedData.username ? updatedData.username.toLowerCase() : oldUsernameLower;
-
-        const updatedUser: User = { ...currentUser, ...updatedData };
-        if (updatedData.username) {
-            updatedUser.usernameLastUpdatedAt = Date.now();
-        }
-        if (updatedData.name || updatedData.profession || updatedData.bio || updatedData.role) {
-            updatedUser.profileLastUpdatedAt = Date.now();
-        }
+        const userRef = doc(db, "users", currentUser.uid);
         
-        const updatedUsers = { ...users };
-        // If username changed, update the key in the database
-        if (oldUsernameLower !== newUsernameLower) {
-            delete updatedUsers[oldUsernameLower];
-        }
-        updatedUsers[newUsernameLower] = updatedUser;
-
-        setUsers(updatedUsers);
-        setCurrentUser(updatedUser);
-        persistUsers(updatedUsers);
-        persistCurrentUser(updatedUser);
-        return true;
-    }, [currentUser, users]);
-
-    const logout = useCallback(() => {
-        setCurrentUser(null);
-        persistCurrentUser(null);
-    }, []);
-
-    const lockSite = useCallback(() => {
-        if (!currentUser) {
-            setIsLocked(true);
+        try {
+            await updateDoc(userRef, updatedData);
+            setCurrentUser(prev => prev ? { ...prev, ...updatedData } : null);
+            return true;
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            return false;
         }
     }, [currentUser]);
-    
+
     const value = useMemo(() => ({
         currentUser,
-        isLocked: isInitialized && isLocked && !currentUser,
+        isAuthLoading,
+        isProfileCreationRequired,
+        login,
+        logout,
         register,
         updateUser,
-        logout,
-        lockSite,
         isUsernameTaken,
-    }), [currentUser, isLocked, register, updateUser, logout, lockSite, isUsernameTaken, isInitialized]);
+    }), [currentUser, isAuthLoading, isProfileCreationRequired, login, logout, register, updateUser, isUsernameTaken]);
 
     return (
         <UserContext.Provider value={value}>
